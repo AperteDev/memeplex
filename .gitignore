@@ -2,6 +2,6 @@ __pycache__/
 .cache/
 .venv/
 assets/example-memes
-src/test.py
+src-python/test.py
 settings.json
-src/ui/*.ui
+src-python/ui/*.ui
