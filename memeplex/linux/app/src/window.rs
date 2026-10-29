@@ -54,6 +54,9 @@ struct Ui {
 struct Preview {
     /// Over the grid, hidden while closed.
     root: gtk::Overlay,
+    /// Hides the grid as it fades in.
+    backdrop: gtk::Box,
+    /// The meme, grown from its thumbnail.
     stack: gtk::Stack,
     picture: gtk::Picture,
     video: gtk::Video,
@@ -63,7 +66,17 @@ struct Preview {
     /// The meme shown, `None` while closed (or closing), and its place in the grid.
     path: RefCell<Option<String>>,
     position: Cell<u32>,
-    /// The fade in or out under way.
+    /// Where the meme grows from (its thumbnail, as insets from the panel's edges: start, top,
+    /// end, bottom), `None` to fade in its place; its insets once grown; and how far grown it
+    /// is, 0 to 1.
+    from: Cell<Option<[f64; 4]>>,
+    inset: Cell<f64>,
+    progress: Cell<f64>,
+    /// The thumbnail it grew from, hidden while it is open.
+    source: RefCell<Option<gtk::Image>>,
+    /// A GIF shown, kept playing while its thumbnail still stands in for it.
+    gif: RefCell<Option<gtk::MediaFile>>,
+    /// The growing or shrinking under way.
     animation: RefCell<Option<adw::TimedAnimation>>,
 }
 
@@ -112,6 +125,7 @@ pub fn present(app: &adw::Application) {
         grid: get(&b, "grid"),
         preview: Preview {
             root: get(&b, "preview"),
+            backdrop: get(&b, "preview_backdrop"),
             stack: get(&b, "preview_stack"),
             picture: get(&b, "preview_picture"),
             video: get(&b, "preview_video"),
@@ -119,6 +133,11 @@ pub fn present(app: &adw::Application) {
             close_action: gio::SimpleAction::new("close-preview", None),
             path: RefCell::default(),
             position: Cell::new(0),
+            from: Cell::new(None),
+            inset: Cell::new(0.0),
+            progress: Cell::new(0.0),
+            source: RefCell::default(),
+            gif: RefCell::default(),
             animation: RefCell::default(),
         },
     });
@@ -208,7 +227,8 @@ fn open_root(ui: &Rc<Ui>, root: String) {
 
 /// Show the memes of `folder` (relative to the root) and the folders in it.
 fn show_folder(ui: &Rc<Ui>, folder: String) {
-    close_preview(ui);
+    // Faded out: its thumbnail is about to make way for another folder's.
+    close_preview(ui, false);
     *ui.selected.borrow_mut() = folder;
     let Some(dir) = selected_dir(ui) else {
         return;
@@ -469,6 +489,8 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
     };
     image.set_tooltip_text(Some(name(&path)));
     image.update_property(&[gtk::accessible::Property::Label(name(&path))]);
+    // Hidden while its meme was out in the preview, if this cell showed it.
+    image.set_opacity(1.0);
     let size = ui.size.get();
     image.set_size_request(size, size);
     if library::kind(&path) == Some(Kind::Video) {
@@ -539,7 +561,7 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
     let weak = Rc::downgrade(ui);
     close.connect_activate(move |_, _| {
         if let Some(ui) = weak.upgrade() {
-            close_preview(&ui);
+            close_preview(&ui, true);
             // Back on the meme it showed.
             let position = ui.preview.position.get();
             ui.grid
@@ -577,12 +599,15 @@ fn place_close(ui: &Ui) {
     });
 }
 
-/// Show `path` over the grid: a picture, a GIF playing, or a video with its controls.
+/// Show `path` over the grid, grown out of its thumbnail at `preview.position`: a picture, a
+/// GIF playing, or a video with its controls.
 fn open_preview(ui: &Rc<Ui>, path: String) {
     let p = &ui.preview;
     *p.path.borrow_mut() = Some(path.clone());
+    p.gif.take();
     ui.content_page.set_title(name(&path));
-    if library::kind(&path) == Some(Kind::Video) {
+    let video = library::kind(&path) == Some(Kind::Video);
+    if video {
         p.video.set_filename(Some(&path));
         p.stack.set_visible_child(&p.video);
     } else {
@@ -594,17 +619,21 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
             load_picture(ui, &path);
         }
     }
+    // Pictures keep a little room around them; videos fill the panel, controls at its foot.
+    p.inset.set(if video { 0.0 } else { 12.0 });
+    find_thumbnail(ui, true);
     p.close_action.set_enabled(true);
     if !p.root.is_visible() {
-        p.root.set_opacity(0.0);
+        set_progress(ui, 0.0);
         p.root.set_visible(true);
     }
     animate_preview(ui, true);
     p.close.grab_focus();
 }
 
-/// Fade the preview out, back to the grid.
-fn close_preview(ui: &Rc<Ui>) {
+/// Close the preview: shrunk back into its thumbnail if `to_thumbnail` and it is on screen,
+/// else faded out.
+fn close_preview(ui: &Rc<Ui>, to_thumbnail: bool) {
     if ui.preview.path.take().is_none() {
         return;
     }
@@ -612,28 +641,102 @@ fn close_preview(ui: &Rc<Ui>) {
     if let Some(dir) = selected_dir(ui) {
         ui.content_page.set_title(name(&dir));
     }
+    find_thumbnail(ui, to_thumbnail);
     animate_preview(ui, false);
 }
 
-/// Fade the preview in (growing from a little smaller) or out (shrinking); once out, it is
-/// hidden and stops playing. Instant when the system turns animations off.
+/// Where the preview grows from and shrinks to: the thumbnail at `preview.position`, hidden
+/// while the meme is out of it, if `wanted` and on screen; else nowhere (it fades).
+fn find_thumbnail(ui: &Ui, wanted: bool) {
+    let p = &ui.preview;
+    if let Some(shown) = p.source.take() {
+        shown.set_opacity(1.0);
+    }
+    let found = wanted
+        .then(|| thumbnail_insets(ui, p.position.get()))
+        .flatten();
+    p.from.set(found.as_ref().map(|(insets, _)| *insets));
+    if let Some((_, image)) = found {
+        image.set_opacity(0.0);
+        *p.source.borrow_mut() = Some(image);
+    }
+}
+
+/// The picture of the thumbnail at `position` as insets from the preview's edges (start, top,
+/// end, bottom), with its image, if it is on screen.
+fn thumbnail_insets(ui: &Ui, position: u32) -> Option<([f64; 4], gtk::Image)> {
+    let area = ui.preview.root.parent()?;
+    let item = ui
+        .cells
+        .borrow()
+        .iter()
+        .filter_map(|c| c.upgrade())
+        .find(|i| i.position() == position && i.item().is_some())?;
+    let image = item.child().and_downcast::<gtk::Image>()?;
+    if !image.is_mapped() {
+        return None;
+    }
+    let bounds = image.compute_bounds(&area)?;
+    let (bw, bh) = (f64::from(bounds.width()), f64::from(bounds.height()));
+    // The picture fits in a square of the thumbnail size (or less, as the cell allows), in the
+    // middle of the image; a video's icon grows from that whole square.
+    let side = f64::from(ui.size.get()).min(bw).min(bh);
+    let ratio = image
+        .paintable()
+        .map(|p| p.intrinsic_aspect_ratio())
+        .filter(|r| *r > 0.0)
+        .unwrap_or(1.0);
+    let (w, h) = if ratio >= 1.0 {
+        (side, side / ratio)
+    } else {
+        (side * ratio, side)
+    };
+    let left = f64::from(bounds.x()) + (bw - w) / 2.0;
+    let top = f64::from(bounds.y()) + (bh - h) / 2.0;
+    let right = f64::from(area.width()) - left - w;
+    let bottom = f64::from(area.height()) - top - h;
+    let rtl = area.direction() == gtk::TextDirection::Rtl;
+    let (start, end) = if rtl { (right, left) } else { (left, right) };
+    Some(([start, top, end, bottom], image))
+}
+
+/// The preview `v` of the way from its thumbnail (0) to the whole panel (1): the backdrop and
+/// the X button fade in as the meme grows, or fades in from a little smaller without one.
+fn set_progress(ui: &Ui, v: f64) {
+    let p = &ui.preview;
+    p.progress.set(v);
+    p.backdrop.set_opacity(v);
+    p.close.set_opacity(v);
+    let to = p.inset.get();
+    let (from, opacity) = match p.from.get() {
+        Some(from) => (from, 1.0),
+        None => ([to + 48.0; 4], v),
+    };
+    p.stack.set_opacity(opacity);
+    let margin = |i: usize| (from[i] + (to - from[i]) * v).max(0.0).round() as i32;
+    p.stack.set_margin_start(margin(0));
+    p.stack.set_margin_top(margin(1));
+    p.stack.set_margin_end(margin(2));
+    p.stack.set_margin_bottom(margin(3));
+}
+
+/// Grow the preview to the whole panel or shrink it back, from wherever it is; once back, it is
+/// hidden, stops playing and its thumbnail shows again. Instant when the system turns
+/// animations off.
 fn animate_preview(ui: &Rc<Ui>, open: bool) {
     let p = &ui.preview;
     // Turned around midway: from where that one got to.
     if let Some(running) = p.animation.take() {
         running.pause();
     }
-    let (root, stack) = (p.root.clone(), p.stack.clone());
+    let weak = Rc::downgrade(ui);
     let target = adw::CallbackAnimationTarget::new(move |v| {
-        root.set_opacity(v);
-        let inset = ((1.0 - v) * 48.0).round() as i32;
-        stack.set_margin_start(inset);
-        stack.set_margin_end(inset);
-        stack.set_margin_top(inset);
-        stack.set_margin_bottom(inset);
+        if let Some(ui) = weak.upgrade() {
+            set_progress(&ui, v);
+        }
     });
     let to = if open { 1.0 } else { 0.0 };
-    let animation = adw::TimedAnimation::new(&p.root, p.root.opacity(), to, 200, target);
+    let animation = adw::TimedAnimation::new(&p.root, p.progress.get(), to, 250, target);
     animation.set_easing(adw::Easing::EaseOutCubic);
     if !open {
         let weak = Rc::downgrade(ui);
@@ -643,6 +746,10 @@ fn animate_preview(ui: &Rc<Ui>, open: bool) {
                 p.root.set_visible(false);
                 p.picture.set_paintable(None::<&gdk::Paintable>);
                 p.video.set_media_stream(None::<&gtk::MediaStream>);
+                p.gif.take();
+                if let Some(thumbnail) = p.source.take() {
+                    thumbnail.set_opacity(1.0);
+                }
             }
         });
     }
@@ -651,8 +758,21 @@ fn animate_preview(ui: &Rc<Ui>, open: bool) {
 }
 
 /// A GIF playing in a loop, through GStreamer; its first frame as a picture without a decoder.
+/// Its thumbnail shows until the first frame is decoded, so it grows out of what the grid
+/// showed.
 fn play_gif(ui: &Rc<Ui>, path: &str) {
+    let thumbnail = ui.thumbs.made.borrow().get(path).map(|(_, t)| t.clone());
+    ui.preview.picture.set_paintable(thumbnail.as_ref());
     let media = gtk::MediaFile::for_filename(path);
+    let weak = Rc::downgrade(ui);
+    media.connect_invalidate_contents(move |media| {
+        if let Some(ui) = weak.upgrade()
+            && ui.preview.gif.borrow().as_ref() == Some(media)
+            && ui.preview.picture.paintable().as_ref() != Some(media.upcast_ref())
+        {
+            ui.preview.picture.set_paintable(Some(media));
+        }
+    });
     // Looped by hand: with `loop` set, GTK (4.24) stops a GIF on its last frame at the end.
     media.connect_ended_notify(|media| {
         if media.is_ended() {
@@ -670,7 +790,7 @@ fn play_gif(ui: &Rc<Ui>, path: &str) {
         }
     });
     media.play();
-    ui.preview.picture.set_paintable(Some(&media));
+    *ui.preview.gif.borrow_mut() = Some(media);
 }
 
 /// A picture at full size: its thumbnail at once, the full one once loaded.

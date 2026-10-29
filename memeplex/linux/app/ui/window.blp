@@ -143,21 +143,23 @@ Adw.ApplicationWindow window {
             }
           };
 
-          // A meme over the whole panel, GIFs and videos playing; it fades and grows in and out
-          // (src/window.rs `open_preview`, `animate_preview`).
+          // A meme over the whole panel, GIFs and videos playing. It grows out of its thumbnail
+          // while the backdrop fades in over the grid, and back (src/window.rs `open_preview`,
+          // `animate_preview`).
           [overlay]
           Gtk.Overlay preview {
             visible: false;
-            styles ["preview"]
 
+            Gtk.Box preview_backdrop {
+              styles ["preview"]
+            }
+
+            // Its margins put it where the thumbnail is while it grows (`set_progress`).
+            [overlay]
             Gtk.Stack preview_stack {
               // Pictures, GIFs (playing, muted) among them.
               Gtk.Picture preview_picture {
                 content-fit: contain;
-                margin-start: 12;
-                margin-end: 12;
-                margin-top: 12;
-                margin-bottom: 12;
               }
 
               // Videos, with their controls.
