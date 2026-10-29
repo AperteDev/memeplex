@@ -10,8 +10,8 @@ Being rewritten in Rust, with a shared core and native apps; nothing to run yet.
 [roadmap](docs/ROADMAP.md) for what is planned.
 
 The first version, a GTK app in Python (formerly named Memento), is kept on the
-[`python`](https://github.com/SelfRef/memento/tree/python) branch.
+[`python`](https://github.com/AperteDev/memeplex/tree/python) branch.
 
 | List | Preview |
 | --- | --- |
-| ![The Python version's grid of memes](assets/screenshots/grid.png) | ![The Python version's preview panel](assets/screenshots/preview.png) |
+| ![The Python version's grid of memes](docs/screenshots/grid.png) | ![The Python version's preview panel](docs/screenshots/preview.png) |
