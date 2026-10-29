@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  # The Release workflow builds through this one, with the version it releases.
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build as (scripts/release.py sets it), such as 0.2.0
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  check:
+    name: Check and test
+    runs-on: ubuntu-24.04
+    # GNOME 51's GTK and libadwaita, which the app builds against.
+    container: fedora:45
+    steps:
+      - name: Install the build dependencies
+        run: >-
+          dnf install -y --setopt=install_weak_deps=False
+          git gcc gtk4-devel libadwaita-devel blueprint-compiler gettext
+          appstream desktop-file-utils
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: appstreamcli validate --no-net memeplex/linux/data/dev.aperte.Memeplex.metainfo.xml
+      - run: desktop-file-validate memeplex/linux/data/dev.aperte.Memeplex.desktop
+
+  flatpak:
+    name: Flatpak
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set the release version
+        if: env.VERSION != ''
+        run: python3 scripts/release.py "$VERSION" > /dev/null
+      # flatpak-builder copies the sources (without target/) and builds them from scratch: Cargo's
+      # output is kept between runs instead, with the build's target/ linked to it. Only the CI's
+      # copy of the manifest is changed, local and Flathub builds stay as they are.
+      - name: Restore Cargo's build output
+        uses: actions/cache@v6
+        with:
+          path: target/flatpak-cargo
+          key: flatpak-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: flatpak-cargo-
+      - name: Build into it
+        run: |
+          dir="$PWD/target/flatpak-cargo"
+          mkdir -p "$dir"
+          manifest=memeplex/linux/flatpak/dev.aperte.Memeplex.json
+          jq --arg dir "$dir" '."build-options"."build-args" += ["--filesystem=" + $dir]
+            | .modules[0]."build-commands" |= ["ln -sfn " + $dir + " target"] + .' \
+            "$manifest" > "$manifest.ci" && mv "$manifest.ci" "$manifest"
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: memeplex/linux/flatpak/dev.aperte.Memeplex.json
+          bundle: dev.aperte.Memeplex.flatpak
+          artifact-name: memeplex-flatpak
+
+  tarball:
+    name: Tarball
+    runs-on: ubuntu-24.04
+    # The oldest supported GNOME (49, for libadwaita 1.8): its glibc keeps the binary running on
+    # newer distributions, the .deb's Ubuntu among them. Move on when it reaches its end of life.
+    container: fedora:43
+    steps:
+      - name: Install the build dependencies
+        run: >-
+          dnf install -y --setopt=install_weak_deps=False
+          git gcc make python3 gtk4-devel libadwaita-devel blueprint-compiler gettext
+      - uses: actions/checkout@v7
+      - name: Set the release version
+        if: env.VERSION != ''
+        run: python3 scripts/release.py "$VERSION" > /dev/null
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: make -C memeplex/linux stage PREFIX=/usr DESTDIR="$PWD/target/stage"
+      # Files only: extracted into /, directory entries would reset the system's own.
+      - name: Pack the staged tree
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          (cd target/stage && find . ! -type d | sort) |
+            tar -C target/stage -czf "target/memeplex-$version-$(uname -m).tar.gz" -T -
+      - uses: actions/upload-artifact@v7
+        with:
+          name: memeplex-tarball
+          path: target/memeplex-*.tar.gz
+          if-no-files-found: error
+
+  deb:
+    name: Debian package
+    needs: tarball
+    runs-on: ubuntu-24.04
+    # The Ubuntu LTS the package is for; dpkg-shlibdeps names its libraries.
+    container: ubuntu:26.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install the packaging tools and the libraries the app links to
+        run: >-
+          apt-get update && apt-get install -y --no-install-recommends
+          dpkg-dev libgtk-4-1 libadwaita-1-0
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: memeplex-tarball
+          path: target
+      - name: Build the package from the tarball's tree
+        run: |
+          tarball=$(ls target/memeplex-*.tar.gz)
+          version=$(basename "$tarball" | sed 's/^memeplex-\(.*\)-[^-]*\.tar\.gz$/\1/')
+          mkdir target/stage && tar -C target/stage -xzf "$tarball"
+          scripts/deb.sh target/stage "$version" target/deb
+      - name: Install it, so its dependencies are checked
+        run: apt-get install -y ./target/deb/*.deb
+      - uses: actions/upload-artifact@v7
+        with:
+          name: memeplex-deb
+          path: target/deb/*.deb
+          if-no-files-found: error

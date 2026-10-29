@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, such as 0.2.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  # Checks and packages with the version set; nothing is committed or tagged unless this passes.
+  build:
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ inputs.version }}
+
+  publish:
+    name: Commit, tag and publish
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set the version and move Unreleased changes and links under it
+        run: python3 scripts/release.py "$VERSION" > "$RUNNER_TEMP/notes.md"
+      - name: Commit and tag the release
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "chore(release): $VERSION"
+          git tag "v$VERSION"
+          git push --atomic origin "HEAD:$GITHUB_REF_NAME" "v$VERSION"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: memeplex-*
+          path: dist
+          merge-multiple: true
+      # The Flatpak bundle, the tarball and the .deb.
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "v$VERSION" dist/*
+          --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
