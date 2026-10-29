@@ -3,8 +3,18 @@
 ## Name
 
 - The app is Memeplex (formerly Memento, taken on the AUR): app ID `dev.aperte.Memeplex`,
-  lowercase `memeplex` for crates, packages and the gettext domain. The repository moves to
-  `AperteDev` later.
+  lowercase `memeplex` for crates, packages and the gettext domain. The repository is
+  `AperteDev/memeplex`.
+
+## Layout
+
+- As in Todav, the apps live under `memeplex/` (Todav roots its bindings' workspace there):
+  `memeplex/linux/app` (`memeplex-linux`, GTK4 and libadwaita, Blueprint views in `ui/`),
+  `memeplex/linux/data` (desktop file, metainfo, icon), `memeplex/linux/flatpak`, and later
+  `memeplex/core`, `memeplex/ffi`, `memeplex/android`, `memeplex/windows`.
+- `make -C memeplex/linux install` installs for the user, `stage` the system-wide tree the
+  tarball and `.deb` are made of, `flatpak` the Flatpak.
+- The app icon is a placeholder until one is designed.
 
 ## Git
 
@@ -28,6 +38,11 @@
   GTK4/libadwaita app for Linux, Jetpack Compose for Android, WinUI for Windows. When something
   here is not decided yet, look at how Todav does it (its `AGENTS.md`, `docs/ROADMAP.md` and
   code), and write down code copied from either sibling here, so fixes can be ported.
+- Copied from Todav: `memeplex/linux/app/src/i18n.rs` (`init`, `locale_dir`; copy its
+  `gettext`, `ngettext`, `pgettext` when Rust code needs them), `build.rs`,
+  `memeplex/linux/Makefile`, the Flatpak manifest, `po/its/`, `scripts/i18n.sh`,
+  `scripts/release.py`, `scripts/deb.sh`, `.github/` (workflows, issue templates) and
+  `docs/CONTRIBUTING.md`.
 - Never read or write the siblings' configuration, credentials, settings or databases.
 
 ## Shared code
@@ -39,6 +54,28 @@
   its API exportable: synchronous, no closures or generics in what front-ends call.
 - Decoding video and drawing the UI belong to the platform (GStreamer and GTK, Android's media
   APIs, Windows'); the core gets decoded frames and pixels.
+
+## Translations
+
+- All text a user sees is translatable; one gettext domain, `memeplex`, with catalogs in `po/`
+  (languages in `po/LINGUAS`). Blueprint: `_("…")` / `C_("context", "…")`; Rust as in Todav's
+  `AGENTS.md`. Run `scripts/i18n.sh` after changing text and commit `po/` with the change.
+
+## Releases
+
+- Add user-visible changes to `docs/CHANGELOG.md` under `## [Unreleased]`, in the same commit
+  as the change ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)).
+- Releases are cut by the manual Release workflow (`.github/workflows/release.yml`):
+  `scripts/release.py` sets the version in `Cargo.toml`, `Cargo.lock` and the metainfo (with
+  the changes as its notes) and moves the `[Unreleased]` changes under it; CI builds the
+  packages, then it commits `chore(release): X`, tags `vX` and publishes them. Don't bump
+  versions by hand.
+- CI (`.github/workflows/ci.yml`) runs on every push: `cargo fmt --check`, clippy with warnings
+  as errors and the tests on Fedora (GNOME 51), plus the Flatpak bundle, the tarball (built on
+  Fedora 43, the oldest supported GNOME 49) and the `.deb` made from it on Ubuntu 26.04. Run
+  the checks before committing.
+- The metainfo must pass `appstreamcli validate` without warnings (Flathub treats them as
+  errors).
 
 ## Dependencies
 
