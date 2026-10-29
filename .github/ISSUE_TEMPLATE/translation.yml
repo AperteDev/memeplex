@@ -1,0 +1,26 @@
+name: Translation
+description: Ask for a language, offer to translate, or report a wrong translation
+labels: [translation]
+body:
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: 'Czech (cs)'
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is it about?
+      options:
+        - I'd like Memeplex in this language
+        - I'd like to translate it myself
+        - A translation is wrong or missing
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: For a wrong translation, the text you see, where, and what it should say.

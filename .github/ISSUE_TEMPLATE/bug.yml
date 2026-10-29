@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in Memeplex does not work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a meme folder
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: Memeplex version
+      description: Shown in About Memeplex (main menu).
+      placeholder: '0.1.0'
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options:
+        - Flatpak
+        - AUR
+        - .deb package
+        - Tarball
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Distribution and GNOME version
+      placeholder: 'Fedora 44, GNOME 50'
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: What Memeplex prints when started from a terminal with `memeplex-linux` (Flatpak `flatpak run dev.aperte.Memeplex`), after quitting the running one with Ctrl+Q.
+      render: text

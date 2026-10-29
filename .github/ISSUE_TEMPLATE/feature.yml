@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest something Memeplex could do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What would you like to do?
+      description: The task or situation, and what is missing or hard about it now.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could it work?
+      description: Your idea of how it would look or behave, if you have one; other apps that do it well are welcome too.
+  - type: dropdown
+    id: part
+    attributes:
+      label: Part of Memeplex
+      options:
+        - Library and folders
+        - Search and tags
+        - Meme editor
+        - Sync
+        - Something else
