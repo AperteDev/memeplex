@@ -2,6 +2,7 @@
 //! starting with `.`) and symbolic links are skipped; nothing is written. Paths are strings, as
 //! the bindings pass them, and come unsorted: each front-end sorts them in the user's locale.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -29,6 +30,23 @@ pub fn folders(root: &str) -> Vec<String> {
     walk(Path::new(root), "", &mut |rel, is_dir| {
         if is_dir {
             out.push(rel.to_string());
+        }
+    });
+    out
+}
+
+/// How many memes each folder under `root` holds with its folders, by its path relative to
+/// `root` ("" for `root` itself); a folder without any is left out.
+pub fn counts(root: &str) -> HashMap<String, u64> {
+    let mut out = HashMap::new();
+    walk(Path::new(root), "", &mut |rel, is_dir| {
+        if is_dir || kind(rel).is_none() {
+            return;
+        }
+        let mut folder = rel;
+        while !folder.is_empty() {
+            folder = folder.rsplit_once('/').map_or("", |(parent, _)| parent);
+            *out.entry(folder.to_string()).or_insert(0) += 1;
         }
     });
     out
@@ -102,6 +120,13 @@ mod tests {
         let full = |p: &str| format!("{root_str}/{p}");
         assert_eq!(m, [full("IT/Linux/c.mp4"), full("IT/b.gif"), full("a.JPG")]);
         assert_eq!(memes(&full("IT/Linux")), [full("IT/Linux/c.mp4")]);
+        let counts = counts(root_str);
+        let count = |f: &str| counts.get(f).copied();
+        assert_eq!(
+            [count(""), count("IT"), count("IT/Linux")],
+            [Some(3), Some(2), Some(1)]
+        );
+        assert_eq!(counts.len(), 3); // not the hidden folder
         assert_eq!(kind("x.mp4"), Some(Kind::Video));
         assert_eq!(kind("x"), None);
 
