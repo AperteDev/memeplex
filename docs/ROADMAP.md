@@ -1,4 +1,4 @@
-# Memento — Roadmap
+# Memeplex — Roadmap
 
 Planned work, not yet done; the order is not fixed. A rewrite of the Python app (branch
 `python`, `src-python/`) as a meme and reaction library: find the right meme fast by what is in
@@ -80,8 +80,6 @@ the same models and code.
 
 ## Open questions and what needs testing
 
-- **Name**: "memento" is taken on the AUR. To decide before the app ID, the Flatpak and the
-  translations' domain are set.
 - **Embedding model**: test on our own memes with a set of about 50 queries in Polish and
   English, each with a known answer; measure recall, indexing speed on a desktop CPU and on a
   phone, and size. Candidates: NLLB-CLIP base SigLIP (multilingual; Immich ships ONNX exports

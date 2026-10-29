@@ -1,5 +1,11 @@
 # Agent notes
 
+## Name
+
+- The app is Memeplex (formerly Memento, taken on the AUR): app ID `dev.aperte.Memeplex`,
+  lowercase `memeplex` for crates, packages and the gettext domain. The repository moves to
+  `AperteDev` later.
+
 ## Git
 
 - Work on `master` only; don't create branches. Commit as you go, one logical change per commit;

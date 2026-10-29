@@ -1,41 +1,17 @@
-# Memento
-> /məˈmɛntoʊ/
+# Memeplex
 
-Meme browser, search and tagger (very WIP)
-
-## Demo
-https://github.com/SelfRef/memento/assets/69125050/c1f41c03-7060-4929-8a4e-13588ca22c91
-
-## Screenshots
-List | Preview
----|---
-![list](assets/screenshots/grid.png) | ![preview](assets/screenshots/preview.png)
-
-
-## Features (incomplete)
-- Browse your meme folder recursively
-- Cache generation (loads faster second time)
-- Preview panel with image details
-- Search function based on filename and tags
-- Build-in OCR tagging (allows to search for image text)
-- More to come: [planned features](https://github.com/SelfRef/memento/labels/enhancement), [project roadmap](https://github.com/users/SelfRef/projects/4)
+Your memes, GIFs and reels, found by what is in them. A library app for GNOME, Android and
+Windows that indexes your meme folders on the device (text in images, what they show) so you
+can search them by description, then copy, drag or share the right one.
 
 ## Status
-This project is in development state, not for daily use yet.
 
-## Setup
+Being rewritten in Rust, with a shared core and native apps; nothing to run yet. See the
+[roadmap](docs/ROADMAP.md) for what is planned.
 
-### Requirements
-- GTK 4
-- libadwaita
-- Python 3
-- blueprint-compiler
-- pillow (PyPI, required)
-- unidecode (PyPI, requred)
-- easyocr (PyPI, optional for OCR feature)
+The first version, a GTK app in Python (formerly named Memento), is kept on the
+[`python`](https://github.com/SelfRef/memento/tree/python) branch.
 
-### Run
-- Install requirements
-- Clone repo
-- Open VS Code workspace
-- Run debugger or default build task
+| List | Preview |
+| --- | --- |
+| ![The Python version's grid of memes](assets/screenshots/grid.png) | ![The Python version's preview panel](assets/screenshots/preview.png) |
