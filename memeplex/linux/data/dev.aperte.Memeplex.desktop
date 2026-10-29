@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Memeplex
+Comment=Find memes by what is in them
+Exec=memeplex-linux
+Icon=dev.aperte.Memeplex
+Terminal=false
+Type=Application
+Categories=Graphics;Viewer;
+Keywords=meme;gif;reaction;image;video;search;
+StartupNotify=true

@@ -5,3 +5,5 @@ assets/example-memes
 src-python/test.py
 settings.json
 src-python/ui/*.ui
+/target
+/tmp

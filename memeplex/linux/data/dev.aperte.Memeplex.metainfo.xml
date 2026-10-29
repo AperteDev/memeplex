@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 SelfRef -->
+<component type="desktop-application">
+  <id>dev.aperte.Memeplex</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Memeplex</name>
+  <summary>Find memes by what is in them</summary>
+  <description>
+    <p>
+      Memeplex is a library for your memes, GIFs and reels. It indexes your meme folders on the
+      device, the text in images and what they show, so you can search them by description, then
+      copy, drag or share the right one.
+    </p>
+  </description>
+  <developer id="dev.aperte">
+    <name translate="no">Aperte</name>
+  </developer>
+  <launchable type="desktop-id">dev.aperte.Memeplex.desktop</launchable>
+  <translation type="gettext">memeplex</translation>
+  <url type="homepage">https://github.com/AperteDev/memeplex</url>
+  <url type="bugtracker">https://github.com/AperteDev/memeplex/issues</url>
+  <url type="vcs-browser">https://github.com/AperteDev/memeplex</url>
+  <url type="contribute">https://github.com/AperteDev/memeplex/blob/master/docs/CONTRIBUTING.md</url>
+  <url type="donation">https://github.com/sponsors/SelfRef</url>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <releases>
+  </releases>
+</component>

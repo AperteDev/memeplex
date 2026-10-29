@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder until the icon is designed. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="12" y="16" width="104" height="96" rx="16" fill="#813d9c"/>
+  <rect x="12" y="16" width="104" height="88" rx="16" fill="#9141ac"/>
+  <rect x="26" y="28" width="76" height="62" rx="6" fill="#ffffff"/>
+  <circle cx="48" cy="48" r="8" fill="#f6d32d"/>
+  <path d="M30 86 L56 58 L72 74 L82 64 L98 86 Z" fill="#26a269"/>
+</svg>

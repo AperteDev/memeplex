@@ -1,0 +1,36 @@
+using Gtk 4.0;
+using Adw 1;
+
+Adw.ApplicationWindow window {
+  title: "Memeplex";
+  default-width: 900;
+  default-height: 700;
+
+  content: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      [end]
+      MenuButton {
+        primary: true;
+        icon-name: "open-menu-symbolic";
+        tooltip-text: _("Main Menu");
+        menu-model: main_menu;
+      }
+    }
+
+    content: Adw.StatusPage {
+      icon-name: "dev.aperte.Memeplex";
+      title: "Memeplex";
+      description: _("Nothing here yet");
+    };
+  };
+}
+
+menu main_menu {
+  section {
+    item {
+      label: _("_About Memeplex");
+      action: "app.about";
+    }
+  }
+}

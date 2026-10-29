@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<!-- What of the app's metainfo is translated (xgettext extracts it, msgfmt fills it in); kept
+     here so builds need no AppStream package. Each <p> and <li> of the description is its own
+     message. Release notes (description translate="no")
+     stay in English, as the changelog they come from. -->
+<its:rules xmlns:its="http://www.w3.org/2005/11/its" version="2.0">
+  <its:withinTextRule withinText="yes" selector="/component//description//em |
+                                                 /component//description//code"/>
+  <its:translateRule selector="/component" translate="no"/>
+  <its:translateRule selector="/component/name |
+                               /component/summary |
+                               /component/description |
+                               /component/screenshots/screenshot/caption"
+                     translate="yes"/>
+</its:rules>

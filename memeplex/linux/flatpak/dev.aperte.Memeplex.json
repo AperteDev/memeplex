@@ -1,0 +1,36 @@
+{
+  "id": "dev.aperte.Memeplex",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "51",
+  "sdk": "org.gnome.Sdk",
+  "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
+  "command": "memeplex-linux",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--device=dri"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
+    "env": { "CARGO_HOME": "/run/build/memeplex/cargo" },
+    "build-args": ["--share=network"]
+  },
+  "modules": [
+    {
+      "name": "memeplex",
+      "buildsystem": "simple",
+      "build-commands": [
+        "cargo build --release --locked -p memeplex-linux",
+        "make -C memeplex/linux install-data PREFIX=/app BINDIR=/app/bin"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "../../..",
+          "skip": ["target", "tmp", ".git", "src-python", ".flatpak-builder", "flatpak_app", "repo"]
+        }
+      ]
+    }
+  ]
+}

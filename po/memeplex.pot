@@ -1,0 +1,51 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the Memeplex package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Memeplex\n"
+"Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
+"POT-Creation-Date: 2026-10-29 16:02+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: memeplex/linux/app/ui/window.blp:16
+msgid "Main Menu"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:24
+msgid "Nothing here yet"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:32
+msgid "_About Memeplex"
+msgstr ""
+
+#: memeplex/linux/data/dev.aperte.Memeplex.desktop:2
+#: memeplex/linux/data/dev.aperte.Memeplex.metainfo.xml:7
+msgid "Memeplex"
+msgstr ""
+
+#: memeplex/linux/data/dev.aperte.Memeplex.desktop:3
+#: memeplex/linux/data/dev.aperte.Memeplex.metainfo.xml:8
+msgid "Find memes by what is in them"
+msgstr ""
+
+#: memeplex/linux/data/dev.aperte.Memeplex.desktop:9
+msgid "meme;gif;reaction;image;video;search;"
+msgstr ""
+
+#: memeplex/linux/data/dev.aperte.Memeplex.metainfo.xml:10
+msgid ""
+"Memeplex is a library for your memes, GIFs and reels. It indexes your meme "
+"folders on the device, the text in images and what they show, so you can "
+"search them by description, then copy, drag or share the right one."
+msgstr ""
