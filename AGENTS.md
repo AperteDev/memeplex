@@ -47,7 +47,8 @@
   `scripts/release.py`, `scripts/deb.sh`, `.github/` (workflows, issue templates) and
   `docs/CONTRIBUTING.md`.
 - Copied from Notav: the sidebar's folder tree in `memeplex/linux/app/src/window.rs`
-  (`refresh_tree`, `tree_row`, `toggle`, `INDENT`; a row picks the folder, its arrow opens it)
+  (`refresh_tree`, `tree_row` with its dimmed count, `toggle`, `INDENT`; a row picks the
+  folder, its arrow opens it; the counts come from the core's `library::counts`)
   and `sorted` (Notav's `by_name`).
 - Never read or write the siblings' configuration, credentials, settings or databases.
 

@@ -32,6 +32,8 @@ struct Ui {
     root: RefCell<Option<String>>,
     /// Its folders relative to it, "" for itself.
     folders: RefCell<Vec<String>>,
+    /// How many memes each of them holds with its folders.
+    counts: RefCell<HashMap<String, u64>>,
     /// Folders shown open in the tree.
     expanded: RefCell<HashSet<String>>,
     /// The folder of each row of the tree, in order.
@@ -72,6 +74,7 @@ pub fn present(app: &adw::Application) {
         memes: gio::ListStore::new::<gtk::StringObject>(),
         root: RefCell::default(),
         folders: RefCell::default(),
+        counts: RefCell::default(),
         expanded: RefCell::default(),
         rows: RefCell::default(),
         selected: RefCell::default(),
@@ -167,6 +170,7 @@ fn open_root(ui: &Rc<Ui>, root: String) {
     let mut folders = library::folders(&root);
     folders.push(String::new());
     *ui.folders.borrow_mut() = folders;
+    *ui.counts.borrow_mut() = library::counts(&root);
     *ui.root.borrow_mut() = Some(root);
     *ui.expanded.borrow_mut() = HashSet::from([String::new()]);
     ui.thumbs.made.borrow_mut().clear();
@@ -279,7 +283,8 @@ fn refresh_tree(ui: &Rc<Ui>) {
 }
 
 /// A folder's row, indented by its depth; `open` is whether it shows its folders, `None`
-/// without any. Its arrow opens and closes it, the rest shows its memes.
+/// without any. Its arrow opens and closes it, the rest shows its memes; their count is dimmed
+/// at its end.
 fn tree_row(
     ui: &Rc<Ui>,
     depth: usize,
@@ -319,7 +324,14 @@ fn tree_row(
     let label = gtk::Label::new(Some(name(path)));
     label.set_xalign(0.0);
     label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    label.set_hexpand(true);
     line.append(&label);
+    let count = ui.counts.borrow().get(folder).copied().unwrap_or(0);
+    let count = gtk::Label::new(Some(&count.to_string()));
+    count.add_css_class("dim-label");
+    count.add_css_class("numeric");
+    count.set_margin_end(4);
+    line.append(&count);
     let row = gtk::ListBoxRow::new();
     row.set_child(Some(&line));
     row.set_tooltip_text(Some(path));
