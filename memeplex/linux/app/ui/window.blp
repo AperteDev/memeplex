@@ -99,45 +99,86 @@ Adw.ApplicationWindow window {
           }
         }
 
-        content: Gtk.Stack stack {
-          Gtk.StackPage {
-            name: "welcome";
+        content: Gtk.Overlay {
+          child: Gtk.Stack stack {
+            Gtk.StackPage {
+              name: "welcome";
 
-            child: Adw.StatusPage {
-              icon-name: "dev.aperte.Memeplex";
-              title: "Memeplex";
-              description: _("Open a folder with your memes to start");
+              child: Adw.StatusPage {
+                icon-name: "dev.aperte.Memeplex";
+                title: "Memeplex";
+                description: _("Open a folder with your memes to start");
 
-              Gtk.Button {
-                label: _("Open Folder…");
-                action-name: "win.open";
-                halign: center;
-                styles ["suggested-action", "pill"]
+                Gtk.Button {
+                  label: _("Open Folder…");
+                  action-name: "win.open";
+                  halign: center;
+                  styles ["suggested-action", "pill"]
+                }
+              };
+            }
+
+            Gtk.StackPage {
+              name: "empty";
+
+              child: Adw.StatusPage {
+                icon-name: "folder-pictures-symbolic";
+                title: _("No Memes");
+                description: _("This folder has no pictures or videos");
+              };
+            }
+
+            Gtk.StackPage {
+              name: "grid";
+
+              child: Gtk.ScrolledWindow {
+                hscrollbar-policy: never;
+
+                Gtk.GridView grid {
+                  max-columns: 30;
+                  single-click-activate: true;
+                  styles ["memes"]
+                }
+              };
+            }
+          };
+
+          // A meme over the whole panel, GIFs and videos playing; it fades and grows in and out
+          // (src/window.rs `open_preview`, `animate_preview`).
+          [overlay]
+          Gtk.Overlay preview {
+            visible: false;
+            styles ["preview"]
+
+            Gtk.Stack preview_stack {
+              // Pictures, GIFs (playing, muted) among them.
+              Gtk.Picture preview_picture {
+                content-fit: contain;
+                margin-start: 12;
+                margin-end: 12;
+                margin-top: 12;
+                margin-bottom: 12;
               }
-            };
-          }
 
-          Gtk.StackPage {
-            name: "empty";
-
-            child: Adw.StatusPage {
-              icon-name: "folder-pictures-symbolic";
-              title: _("No Memes");
-              description: _("This folder has no pictures or videos");
-            };
-          }
-
-          Gtk.StackPage {
-            name: "grid";
-
-            child: Gtk.ScrolledWindow {
-              hscrollbar-policy: never;
-
-              Gtk.GridView grid {
-                max-columns: 30;
-                styles ["memes"]
+              // Videos, with their controls.
+              Gtk.Video preview_video {
+                autoplay: true;
+                loop: true;
               }
-            };
+            }
+
+            // On the side of the window's own close button (src/window.rs `place_close`).
+            [overlay]
+            Gtk.Button preview_close {
+              icon-name: "window-close-symbolic";
+              tooltip-text: _("Close Preview (Esc)");
+              action-name: "win.close-preview";
+              valign: start;
+              margin-start: 12;
+              margin-end: 12;
+              margin-top: 12;
+              styles ["osd", "circular"]
+            }
           }
         };
       };

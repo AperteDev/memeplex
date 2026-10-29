@@ -15,8 +15,10 @@ use std::sync::{Arc, Mutex};
 /// How far each folder level is indented in the tree, and the width of a folder's arrow.
 const INDENT: i32 = 16;
 
+/// The preview hides the grid under it once faded in.
 const CSS: &str = "
 .memes > child { padding: 6px; border-radius: 12px; }
+.preview { background-color: var(--window-bg-color); }
 ";
 
 struct Ui {
@@ -44,6 +46,25 @@ struct Ui {
     /// The grid's cells, to resize when the size changes.
     cells: RefCell<Vec<glib::WeakRef<gtk::ListItem>>>,
     thumbs: Thumbs,
+    grid: gtk::GridView,
+    preview: Preview,
+}
+
+/// A meme over the whole panel, opened from the grid.
+struct Preview {
+    /// Over the grid, hidden while closed.
+    root: gtk::Overlay,
+    stack: gtk::Stack,
+    picture: gtk::Picture,
+    video: gtk::Video,
+    close: gtk::Button,
+    /// `win.close-preview`, enabled while it is open: Esc goes elsewhere otherwise.
+    close_action: gio::SimpleAction,
+    /// The meme shown, `None` while closed (or closing), and its place in the grid.
+    path: RefCell<Option<String>>,
+    position: Cell<u32>,
+    /// The fade in or out under way.
+    animation: RefCell<Option<adw::TimedAnimation>>,
 }
 
 /// Thumbnails, made on a few threads for the cells on screen.
@@ -88,6 +109,18 @@ pub fn present(app: &adw::Application) {
             wanted: Arc::default(),
             pool: glib::ThreadPool::shared(Some(4)).expect("thread pool"),
         },
+        grid: get(&b, "grid"),
+        preview: Preview {
+            root: get(&b, "preview"),
+            stack: get(&b, "preview_stack"),
+            picture: get(&b, "preview_picture"),
+            video: get(&b, "preview_video"),
+            close: get(&b, "preview_close"),
+            close_action: gio::SimpleAction::new("close-preview", None),
+            path: RefCell::default(),
+            position: Cell::new(0),
+            animation: RefCell::default(),
+        },
     });
     ui.window.set_application(Some(app));
     if crate::sandbox() {
@@ -116,9 +149,10 @@ pub fn present(app: &adw::Application) {
     let size_box: gtk::Box = get(&b, "size_box");
     get::<gtk::PopoverMenu>(&b, "view_popover").add_child(&size_box, "size");
     connect_size(&ui, &get(&b, "size"));
-    let grid: gtk::GridView = get(&b, "grid");
-    grid.set_model(Some(&gtk::NoSelection::new(Some(ui.memes.clone()))));
-    grid.set_factory(Some(&grid_factory(&ui)));
+    ui.grid
+        .set_model(Some(&gtk::NoSelection::new(Some(ui.memes.clone()))));
+    ui.grid.set_factory(Some(&grid_factory(&ui)));
+    connect_preview(&ui, app);
 
     if let Some(root) = saved_root() {
         open_root(&ui, root);
@@ -174,13 +208,10 @@ fn open_root(ui: &Rc<Ui>, root: String) {
 
 /// Show the memes of `folder` (relative to the root) and the folders in it.
 fn show_folder(ui: &Rc<Ui>, folder: String) {
-    let Some(root) = ui.root.borrow().clone() else {
+    close_preview(ui);
+    *ui.selected.borrow_mut() = folder;
+    let Some(dir) = selected_dir(ui) else {
         return;
-    };
-    let dir = if folder.is_empty() {
-        root.clone()
-    } else {
-        format!("{root}/{folder}")
     };
     let memes = sorted(library::memes(&dir), |p| p);
     let items: Vec<_> = memes.iter().map(|p| gtk::StringObject::new(p)).collect();
@@ -188,7 +219,17 @@ fn show_folder(ui: &Rc<Ui>, folder: String) {
     ui.content_page.set_title(name(&dir));
     ui.stack
         .set_visible_child_name(if memes.is_empty() { "empty" } else { "grid" });
-    *ui.selected.borrow_mut() = folder;
+}
+
+/// The full path of the folder whose memes are shown.
+fn selected_dir(ui: &Ui) -> Option<String> {
+    let root = ui.root.borrow().clone()?;
+    let folder = ui.selected.borrow();
+    Some(if folder.is_empty() {
+        root
+    } else {
+        format!("{root}/{folder}")
+    })
 }
 
 fn connect_tree(ui: &Rc<Ui>) {
@@ -477,6 +518,180 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
             && let Some(image) = item.child().and_downcast::<gtk::Image>()
         {
             image.set_paintable(Some(&texture));
+        }
+    });
+}
+
+/// A click on a thumbnail (or Enter) opens it in the preview; its X button or Esc closes it.
+fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
+    let weak = Rc::downgrade(ui);
+    ui.grid.connect_activate(move |_, position| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        if let Some(path) = ui.memes.item(position).and_downcast::<gtk::StringObject>() {
+            ui.preview.position.set(position);
+            open_preview(&ui, path.string().into());
+        }
+    });
+    let close = &ui.preview.close_action;
+    close.set_enabled(false);
+    let weak = Rc::downgrade(ui);
+    close.connect_activate(move |_, _| {
+        if let Some(ui) = weak.upgrade() {
+            close_preview(&ui);
+            // Back on the meme it showed.
+            let position = ui.preview.position.get();
+            ui.grid
+                .scroll_to(position, gtk::ListScrollFlags::FOCUS, None);
+        }
+    });
+    ui.window.add_action(close);
+    app.set_accels_for_action("win.close-preview", &["Escape"]);
+
+    place_close(ui);
+    if let Some(settings) = gtk::Settings::default() {
+        let weak = Rc::downgrade(ui);
+        settings.connect_gtk_decoration_layout_notify(move |_| {
+            if let Some(ui) = weak.upgrade() {
+                place_close(&ui);
+            }
+        });
+    }
+}
+
+/// The X button on the side of the window's own controls, as the decoration layout puts them
+/// (`close` before the colon: on the left).
+fn place_close(ui: &Ui) {
+    let layout = gtk::Settings::default()
+        .and_then(|s| s.gtk_decoration_layout())
+        .unwrap_or_default();
+    let left = layout
+        .split(':')
+        .next()
+        .is_some_and(|start| start.split(',').any(|b| b.trim() == "close"));
+    ui.preview.close.set_halign(if left {
+        gtk::Align::Start
+    } else {
+        gtk::Align::End
+    });
+}
+
+/// Show `path` over the grid: a picture, a GIF playing, or a video with its controls.
+fn open_preview(ui: &Rc<Ui>, path: String) {
+    let p = &ui.preview;
+    *p.path.borrow_mut() = Some(path.clone());
+    ui.content_page.set_title(name(&path));
+    if library::kind(&path) == Some(Kind::Video) {
+        p.video.set_filename(Some(&path));
+        p.stack.set_visible_child(&p.video);
+    } else {
+        p.stack.set_visible_child(&p.picture);
+        // ponytail: GIFs only; animated WebP shows its first frame until GStreamer plays it.
+        if path.to_ascii_lowercase().ends_with(".gif") {
+            play_gif(ui, &path);
+        } else {
+            load_picture(ui, &path);
+        }
+    }
+    p.close_action.set_enabled(true);
+    if !p.root.is_visible() {
+        p.root.set_opacity(0.0);
+        p.root.set_visible(true);
+    }
+    animate_preview(ui, true);
+    p.close.grab_focus();
+}
+
+/// Fade the preview out, back to the grid.
+fn close_preview(ui: &Rc<Ui>) {
+    if ui.preview.path.take().is_none() {
+        return;
+    }
+    ui.preview.close_action.set_enabled(false);
+    if let Some(dir) = selected_dir(ui) {
+        ui.content_page.set_title(name(&dir));
+    }
+    animate_preview(ui, false);
+}
+
+/// Fade the preview in (growing from a little smaller) or out (shrinking); once out, it is
+/// hidden and stops playing. Instant when the system turns animations off.
+fn animate_preview(ui: &Rc<Ui>, open: bool) {
+    let p = &ui.preview;
+    // Turned around midway: from where that one got to.
+    if let Some(running) = p.animation.take() {
+        running.pause();
+    }
+    let (root, stack) = (p.root.clone(), p.stack.clone());
+    let target = adw::CallbackAnimationTarget::new(move |v| {
+        root.set_opacity(v);
+        let inset = ((1.0 - v) * 48.0).round() as i32;
+        stack.set_margin_start(inset);
+        stack.set_margin_end(inset);
+        stack.set_margin_top(inset);
+        stack.set_margin_bottom(inset);
+    });
+    let to = if open { 1.0 } else { 0.0 };
+    let animation = adw::TimedAnimation::new(&p.root, p.root.opacity(), to, 200, target);
+    animation.set_easing(adw::Easing::EaseOutCubic);
+    if !open {
+        let weak = Rc::downgrade(ui);
+        animation.connect_done(move |_| {
+            if let Some(ui) = weak.upgrade() {
+                let p = &ui.preview;
+                p.root.set_visible(false);
+                p.picture.set_paintable(None::<&gdk::Paintable>);
+                p.video.set_media_stream(None::<&gtk::MediaStream>);
+            }
+        });
+    }
+    *p.animation.borrow_mut() = Some(animation.clone());
+    animation.play();
+}
+
+/// A GIF playing in a loop, through GStreamer; its first frame as a picture without a decoder.
+fn play_gif(ui: &Rc<Ui>, path: &str) {
+    let media = gtk::MediaFile::for_filename(path);
+    // Looped by hand: with `loop` set, GTK (4.24) stops a GIF on its last frame at the end.
+    media.connect_ended_notify(|media| {
+        if media.is_ended() {
+            media.seek(0);
+            media.play();
+        }
+    });
+    let (weak, gif) = (Rc::downgrade(ui), path.to_string());
+    media.connect_error_notify(move |media| {
+        if let Some(ui) = weak.upgrade()
+            && media.error().is_some()
+            && ui.preview.path.borrow().as_deref() == Some(gif.as_str())
+        {
+            load_picture(&ui, &gif);
+        }
+    });
+    media.play();
+    ui.preview.picture.set_paintable(Some(&media));
+}
+
+/// A picture at full size: its thumbnail at once, the full one once loaded.
+fn load_picture(ui: &Rc<Ui>, path: &str) {
+    let thumbnail = ui.thumbs.made.borrow().get(path).map(|(_, t)| t.clone());
+    ui.preview.picture.set_paintable(thumbnail.as_ref());
+    let file = path.to_string();
+    let Ok(load) = ui
+        .thumbs
+        .pool
+        .push_future(move || gdk::Texture::from_filename(&file).ok())
+    else {
+        return;
+    };
+    let (weak, path) = (Rc::downgrade(ui), path.to_string());
+    glib::spawn_future_local(async move {
+        // Unless another meme is shown by now.
+        if let (Ok(Some(texture)), Some(ui)) = (load.await, weak.upgrade())
+            && ui.preview.path.borrow().as_deref() == Some(path.as_str())
+        {
+            ui.preview.picture.set_paintable(Some(&texture));
         }
     });
 }

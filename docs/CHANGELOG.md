@@ -15,5 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start. Each folder in the tree shows how many memes it holds, with those of its folders,
   dimmed after its name. View Options, at the right of the grid's header, has a slider for the
   thumbnails' size, kept on this device.
+- Linux: a click on a thumbnail (or Enter) opens the meme over the whole panel, fading and
+  growing in: pictures at full size, GIFs playing in a loop, videos with their controls. The X
+  button (on the side of the window's own close button) or Esc fades it out, back on that meme
+  in the grid.
 
 [Unreleased]: https://github.com/AperteDev/memeplex/commits/HEAD
