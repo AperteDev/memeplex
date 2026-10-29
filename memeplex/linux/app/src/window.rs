@@ -82,6 +82,9 @@ pub fn present(app: &adw::Application) {
         },
     });
     ui.window.set_application(Some(app));
+    if crate::sandbox() {
+        ui.window.set_title(Some("Memeplex (sandbox)"));
+    }
     let css = gtk::CssProvider::new();
     css.load_from_string(CSS);
     gtk::style_context_add_provider_for_display(

@@ -14,7 +14,9 @@
   `memeplex/core` (`memeplex-core`), and later `memeplex/ffi`, `memeplex/android`,
   `memeplex/windows`.
 - `make -C memeplex/linux install` installs for the user, `stage` the system-wide tree the
-  tarball and `.deb` are made of, `flatpak` the Flatpak.
+  tarball and `.deb` are made of, `flatpak` the Flatpak. `sandbox` (Zed task "linux: run in
+  sandbox") runs a separate copy next to the normal one (`MEMEPLEX_SANDBOX`), its config, data
+  and cache in `target/sandbox`; `sandbox-reset` wipes it. Test there, not in the user's app.
 - The app icon is a placeholder until one is designed.
 
 ## Git

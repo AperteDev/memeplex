@@ -1,0 +1,18 @@
+// Run the Linux app straight from the workspace, without `make install`.
+[
+  {
+    "label": "linux: run in sandbox",
+    // Own meme folder and files in target/sandbox, next to the normal app.
+    "command": "make -C memeplex/linux sandbox",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "linux: reset sandbox",
+    "command": "make -C memeplex/linux sandbox-reset",
+    "use_new_terminal": false,
+    "reveal": "no_focus",
+    "hide": "on_success"
+  }
+]

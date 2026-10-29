@@ -43,9 +43,20 @@ flatpak:
 	$(FLATPAK_BUILDER) --user --install --force-clean --install-deps-from=flathub \
 	  --state-dir=../../target/flatpak-builder ../../target/flatpak flatpak/$(ID).json
 
+# A separate copy for testing: its own meme folder and other files in target/sandbox (kept
+# between runs; sandbox-reset wipes it), running next to the normal app.
+SANDBOX = $(abspath ../../target/sandbox)
+sandbox:
+	$(CARGO_BUILD) -p memeplex-linux
+	MEMEPLEX_SANDBOX=1 XDG_CONFIG_HOME=$(SANDBOX)/config XDG_DATA_HOME=$(SANDBOX)/data \
+	  XDG_CACHE_HOME=$(SANDBOX)/cache ../../target/debug/memeplex-linux
+
+sandbox-reset:
+	rm -rf $(SANDBOX)
+
 uninstall:
 	rm -f $(BINDIR)/memeplex-linux $(DATADIR)/applications/$(ID).desktop \
 	  $(DATADIR)/metainfo/$(ID).metainfo.xml $(ICONS)/scalable/apps/$(ID).svg \
 	  $(LOCALE)/*/LC_MESSAGES/memeplex.mo
 
-.PHONY: install install-data stage flatpak uninstall
+.PHONY: install install-data stage flatpak sandbox sandbox-reset uninstall
