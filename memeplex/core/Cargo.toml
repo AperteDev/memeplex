@@ -3,3 +3,9 @@ name = "memeplex-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+
+[dependencies]
+# Files are known by their hash, as in sifter.
+blake3 = "1"
+# 0.38 is what Fedora packages; the system SQLite, as distributions want (as Todav and Notav).
+rusqlite = ">=0.38, <0.41"

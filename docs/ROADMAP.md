@@ -8,14 +8,11 @@ it, then copy, drag or share it. Issue numbers refer to GitHub issues.
 
 - **Folders**: one or more meme folders, scanned recursively (hidden folders skipped) and
   watched for changes; nothing is written into them.
-- **Identity by content**: each file is known by its hash (BLAKE3, as in `sifter`), so renames
-  and moves keep tags and index data; duplicates show up as one hash in several places. A file
-  is hashed again only when its size or modification time changes. A copy recompressed by a chat
+- **Identity by content** (the index hashes files already): renames and moves keep tags and
+  index data; duplicates show up as one hash in several places. A copy recompressed by a chat
   app is another meme; similar memes can offer to copy its tags.
-- **Index**: SQLite (`rusqlite`, as Todav and Notav) in the app's data folder, a cache of each
-  device that can be rebuilt from the folder: paths, hashes, sizes and dates, tags as read from
-  the tag files, OCR text, embeddings, recently used. Thumbnails in the cache folder (XDG on
-  Linux).
+- **Index**: besides each file's hash, tags as read from the tag files, OCR text, embeddings,
+  recently used. Thumbnails in the cache folder (XDG on Linux).
 - **Formats**: PNG, JPEG, WebP, animated GIF (#3) and WebP, videos (MP4, WebM, MOV; #4) such as
   saved reels.
 - **Search** over file names, tags and OCR text, ignoring case and accents (as the Python app's

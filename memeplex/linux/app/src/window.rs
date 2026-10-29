@@ -5,6 +5,7 @@ use crate::i18n::gettext;
 use crate::settings;
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
+use memeplex_core::index::Index;
 use memeplex_core::library::{self, Kind};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -224,6 +225,15 @@ fn open_root(ui: &Rc<Ui>, root: String) {
     folders.push(String::new());
     *ui.folders.borrow_mut() = folders;
     *ui.counts.borrow_mut() = library::counts(&root);
+    // The index, brought up to date off the UI thread: the first time it reads every meme.
+    let db = glib::user_data_dir().join("memeplex/index.sqlite");
+    let scanned = root.clone();
+    std::thread::spawn(move || {
+        if let Err(e) = Index::open(db.to_string_lossy().into_owned()).and_then(|i| i.scan(scanned))
+        {
+            eprintln!("Memeplex: indexing failed: {e}");
+        }
+    });
     *ui.root.borrow_mut() = Some(root);
     *ui.expanded.borrow_mut() = HashSet::from([String::new()]);
     ui.thumbs.made.borrow_mut().clear();

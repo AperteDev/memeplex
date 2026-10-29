@@ -52,7 +52,8 @@
   on a row picks the folder and opens it, its arrow opens or closes it; the counts come from
   the core's `library::counts`) and `sorted` (Notav's `by_name`); View Options in
   `window.blp`, a `Gtk.PopoverMenu` whose custom row (`size_box`, the thumbnail size slider) is
-  added in code, as Notav's `zoom_box`.
+  added in code, as Notav's `zoom_box`; the index's migrations by `PRAGMA user_version` in
+  `memeplex/core/src/index.rs` (Notav's `store::open`).
 - Device settings of the Linux app (the meme folder, the thumbnail size) are in
   `memeplex/linux/app/src/settings.rs`, a key file in the config folder, until the core keeps
   settings.
