@@ -2,19 +2,18 @@
 //! memes of the folder picked in it as a grid of thumbnails.
 
 use crate::i18n::gettext;
+use crate::settings;
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 use memeplex_core::library::{self, Kind};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// How far each folder level is indented in the tree, and the width of a folder's arrow.
 const INDENT: i32 = 16;
-/// A thumbnail's side in the grid; the picture fits in it.
-const THUMB: i32 = 180;
 
 const CSS: &str = "
 .memes > child { padding: 6px; border-radius: 12px; }
@@ -40,14 +39,18 @@ struct Ui {
     rows: RefCell<Vec<String>>,
     /// The folder whose memes are shown.
     selected: RefCell<String>,
+    /// A thumbnail's side in the grid, as View Options sets it; the picture fits in it.
+    size: Cell<i32>,
+    /// The grid's cells, to resize when the size changes.
+    cells: RefCell<Vec<glib::WeakRef<gtk::ListItem>>>,
     thumbs: Thumbs,
 }
 
 /// Thumbnails, made on a few threads for the cells on screen.
 struct Thumbs {
-    /// Made so far, by path. ponytail: in memory for the session; cached on disk by the core
-    /// (see the roadmap) when libraries outgrow it.
-    made: RefCell<HashMap<String, gdk::Texture>>,
+    /// Made so far, by path, with the size they were made for. ponytail: in memory for the
+    /// session; cached on disk by the core (see the roadmap) when libraries outgrow it.
+    made: RefCell<HashMap<String, (i32, gdk::Texture)>>,
     /// The paths of the cells on screen: a thumbnail queued for a cell since scrolled past is
     /// skipped.
     wanted: Arc<Mutex<HashSet<String>>>,
@@ -78,6 +81,8 @@ pub fn present(app: &adw::Application) {
         expanded: RefCell::default(),
         rows: RefCell::default(),
         selected: RefCell::default(),
+        size: Cell::new(0),
+        cells: RefCell::default(),
         thumbs: Thumbs {
             made: RefCell::default(),
             wanted: Arc::default(),
@@ -107,6 +112,10 @@ pub fn present(app: &adw::Application) {
     app.set_accels_for_action("win.open", &["<Control>o"]);
 
     connect_tree(&ui);
+    // The builder sets the menu after its children: the size row is added here.
+    let size_box: gtk::Box = get(&b, "size_box");
+    get::<gtk::PopoverMenu>(&b, "view_popover").add_child(&size_box, "size");
+    connect_size(&ui, &get(&b, "size"));
     let grid: gtk::GridView = get(&b, "grid");
     grid.set_model(Some(&gtk::NoSelection::new(Some(ui.memes.clone()))));
     grid.set_factory(Some(&grid_factory(&ui)));
@@ -138,31 +147,16 @@ fn choose_root(ui: &Rc<Ui>) {
         move |picked| {
             if let Some(path) = picked.ok().and_then(|f| f.path()) {
                 let root = path.to_string_lossy().into_owned();
-                save_root(&root);
+                settings::set("folder", &root);
                 open_root(&ui, root);
             }
         },
     );
 }
 
-/// The meme folder last opened, kept on this device. ponytail: a file of its own until the core
-/// keeps the library's folders.
-fn root_file() -> PathBuf {
-    glib::user_config_dir().join("memeplex/folder")
-}
-
+/// The meme folder last opened, if it is still there.
 fn saved_root() -> Option<String> {
-    let root = std::fs::read_to_string(root_file()).ok()?;
-    Path::new(&root).is_dir().then_some(root)
-}
-
-fn save_root(root: &str) {
-    let file = root_file();
-    let saved =
-        std::fs::create_dir_all(file.parent().unwrap()).and_then(|_| std::fs::write(&file, root));
-    if let Err(e) = saved {
-        glib::g_warning!("memeplex", "Could not save the meme folder: {e}");
-    }
+    settings::get("folder").filter(|root| Path::new(root).is_dir())
 }
 
 /// Show `root`'s folders in the tree, and its memes.
@@ -361,15 +355,47 @@ fn toggle(ui: &Rc<Ui>, folder: &str) {
     }
 }
 
+/// The thumbnail size slider in View Options, at the size saved on this device (its range and
+/// default are in window.blp); moving it resizes the cells on screen.
+fn connect_size(ui: &Rc<Ui>, scale: &gtk::Scale) {
+    if let Some(size) = settings::get("thumbnail_size").and_then(|s| s.parse().ok()) {
+        scale.set_value(size); // within the range: the adjustment clamps it
+    }
+    ui.size.set(scale.value().round() as i32);
+    let weak = Rc::downgrade(ui);
+    scale.connect_value_changed(move |scale| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        let size = scale.value().round() as i32;
+        if size == ui.size.get() {
+            return;
+        }
+        ui.size.set(size);
+        settings::set("thumbnail_size", &size.to_string());
+        ui.cells.borrow_mut().retain(|c| c.upgrade().is_some());
+        let cells: Vec<_> = ui
+            .cells
+            .borrow()
+            .iter()
+            .filter_map(|c| c.upgrade())
+            .collect();
+        for item in &cells {
+            bind_cell(&ui, item);
+        }
+    });
+}
+
 /// The grid's cells: a meme's thumbnail, or an icon for a video.
 fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(|_, item| {
-        let image = gtk::Image::new();
-        image.set_size_request(THUMB, THUMB);
-        item.downcast_ref::<gtk::ListItem>()
-            .unwrap()
-            .set_child(Some(&image));
+    let weak = Rc::downgrade(ui);
+    factory.connect_setup(move |_, item| {
+        let item = item.downcast_ref::<gtk::ListItem>().unwrap();
+        item.set_child(Some(&gtk::Image::new()));
+        if let Some(ui) = weak.upgrade() {
+            ui.cells.borrow_mut().push(item.downgrade());
+        }
     });
     let weak = Rc::downgrade(ui);
     factory.connect_bind(move |_, item| {
@@ -398,21 +424,28 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
     };
     image.set_tooltip_text(Some(name(&path)));
     image.update_property(&[gtk::accessible::Property::Label(name(&path))]);
+    let size = ui.size.get();
+    image.set_size_request(size, size);
     if library::kind(&path) == Some(Kind::Video) {
         // ponytail: an icon until videos play (GStreamer), which gives their frames too.
-        image.set_pixel_size(64);
+        image.set_pixel_size(size / 3);
         image.set_icon_name(Some("video-x-generic-symbolic"));
         return;
     }
-    image.set_pixel_size(THUMB);
-    if let Some(texture) = ui.thumbs.made.borrow().get(&path) {
-        image.set_paintable(Some(texture));
-        return;
+    image.set_pixel_size(size);
+    let size = size * ui.window.scale_factor();
+    match ui.thumbs.made.borrow().get(&path) {
+        // Made at least this large; a smaller one shows until a sharper one is made.
+        Some((made, texture)) => {
+            image.set_paintable(Some(texture));
+            if *made >= size {
+                return;
+            }
+        }
+        None => image.clear(),
     }
-    image.clear();
     ui.thumbs.wanted.lock().unwrap().insert(path.clone());
     let (wanted, p) = (ui.thumbs.wanted.clone(), path.clone());
-    let size = THUMB * ui.window.scale_factor();
     let Ok(made) = ui.thumbs.pool.push_future(move || {
         if !wanted.lock().unwrap().contains(&p) {
             return None;
@@ -428,10 +461,12 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
         let (Ok(Some(texture)), Some(ui)) = (made.await, weak.upgrade()) else {
             return;
         };
-        ui.thumbs
-            .made
-            .borrow_mut()
-            .insert(path.clone(), texture.clone());
+        // Unless a larger one was made meanwhile.
+        let mut made = ui.thumbs.made.borrow_mut();
+        if made.get(&path).is_none_or(|(s, _)| *s < size) {
+            made.insert(path.clone(), (size, texture.clone()));
+        }
+        drop(made);
         // Unless the cell shows another meme by now.
         if let Some(item) = item.upgrade()
             && path_of(&item) == Some(path)

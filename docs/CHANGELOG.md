@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sidebar (a click opens a folder, its arrow closes it), and the memes of the folder picked
   there, with those of its folders, as a grid of thumbnails. The folder opens again at the next
   start. Each folder in the tree shows how many memes it holds, with those of its folders,
-  dimmed after its name.
+  dimmed after its name. View Options, at the right of the grid's header, has a slider for the
+  thumbnails' size, kept on this device.
 
 [Unreleased]: https://github.com/AperteDev/memeplex/commits/HEAD

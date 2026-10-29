@@ -50,7 +50,54 @@ Adw.ApplicationWindow window {
 
       child: Adw.ToolbarView {
         [top]
-        Adw.HeaderBar {}
+        Adw.HeaderBar {
+          [end]
+          Gtk.MenuButton {
+            icon-name: "view-grid-symbolic";
+            tooltip-text: _("View Options");
+
+            // The builder sets the menu after the children: the size row is added to it in
+            // code (`size_box`).
+            popover: Gtk.PopoverMenu view_popover {
+              menu-model: view_menu;
+
+              [size]
+              Gtk.Box size_box {
+                spacing: 6;
+                margin-start: 6;
+                margin-end: 6;
+
+                Gtk.Image {
+                  icon-name: "zoom-out-symbolic";
+                }
+
+                // A thumbnail's side in pixels (src/window.rs `connect_size`).
+                Gtk.Scale size {
+                  hexpand: true;
+                  width-request: 180;
+                  draw-value: false;
+                  tooltip-text: _("Thumbnail Size");
+
+                  adjustment: Gtk.Adjustment {
+                    lower: 80;
+                    upper: 400;
+                    value: 180;
+                    step-increment: 20;
+                    page-increment: 40;
+                  };
+
+                  accessibility {
+                    label: _("Thumbnail Size");
+                  }
+                }
+
+                Gtk.Image {
+                  icon-name: "zoom-in-symbolic";
+                }
+              }
+            };
+          }
+        }
 
         content: Gtk.Stack stack {
           Gtk.StackPage {
@@ -102,6 +149,14 @@ Adw.ApplicationWindow window {
 
     setters {
       split.collapsed: true;
+    }
+  }
+}
+
+menu view_menu {
+  section {
+    item {
+      custom: "size";
     }
   }
 }

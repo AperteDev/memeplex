@@ -49,7 +49,12 @@
 - Copied from Notav: the sidebar's folder tree in `memeplex/linux/app/src/window.rs`
   (`refresh_tree`, `tree_row` with its dimmed count, `toggle`, `INDENT`; unlike Notav, a click
   on a row picks the folder and opens it, its arrow opens or closes it; the counts come from
-  the core's `library::counts`) and `sorted` (Notav's `by_name`).
+  the core's `library::counts`) and `sorted` (Notav's `by_name`); View Options in
+  `window.blp`, a `Gtk.PopoverMenu` whose custom row (`size_box`, the thumbnail size slider) is
+  added in code, as Notav's `zoom_box`.
+- Device settings of the Linux app (the meme folder, the thumbnail size) are in
+  `memeplex/linux/app/src/settings.rs`, a key file in the config folder, until the core keeps
+  settings.
 - Never read or write the siblings' configuration, credentials, settings or databases.
 
 ## Shared code
