@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Linux: open a meme folder (Open in the sidebar, Ctrl+O); its folders show as a tree in the
-  sidebar, and the memes of the folder picked there, with those of its folders, as a grid of
-  thumbnails. The folder opens again at the next start. Each folder in the tree shows how many
-  memes it holds, with those of its folders, dimmed after its name.
+  sidebar (a click opens a folder, its arrow closes it), and the memes of the folder picked
+  there, with those of its folders, as a grid of thumbnails. The folder opens again at the next
+  start. Each folder in the tree shows how many memes it holds, with those of its folders,
+  dimmed after its name.
 
 [Unreleased]: https://github.com/AperteDev/memeplex/commits/HEAD

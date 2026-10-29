@@ -212,9 +212,16 @@ fn connect_tree(ui: &Rc<Ui>) {
         }
     });
     let weak = Rc::downgrade(ui);
-    ui.tree.connect_row_activated(move |_, _| {
-        if let Some(ui) = weak.upgrade() {
-            ui.split.set_show_content(true);
+    // A click (or Enter) also opens the folder; its arrow closes it again.
+    ui.tree.connect_row_activated(move |_, row| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        ui.split.set_show_content(true);
+        let folder = ui.rows.borrow()[row.index() as usize].clone();
+        if !ui.expanded.borrow().contains(&folder) {
+            // After the click, as that rebuilds the tree.
+            glib::idle_add_local_once(move || toggle(&ui, &folder));
         }
     });
     // Right opens the focused folder, Left closes it.
