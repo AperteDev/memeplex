@@ -10,8 +10,9 @@
 
 - As in Todav, the apps live under `memeplex/` (Todav roots its bindings' workspace there):
   `memeplex/linux/app` (`memeplex-linux`, GTK4 and libadwaita, Blueprint views in `ui/`),
-  `memeplex/linux/data` (desktop file, metainfo, icon), `memeplex/linux/flatpak`, and later
-  `memeplex/core`, `memeplex/ffi`, `memeplex/android`, `memeplex/windows`.
+  `memeplex/linux/data` (desktop file, metainfo, icon), `memeplex/linux/flatpak`,
+  `memeplex/core` (`memeplex-core`), and later `memeplex/ffi`, `memeplex/android`,
+  `memeplex/windows`.
 - `make -C memeplex/linux install` installs for the user, `stage` the system-wide tree the
   tarball and `.deb` are made of, `flatpak` the Flatpak.
 - The app icon is a placeholder until one is designed.
@@ -43,6 +44,9 @@
   `memeplex/linux/Makefile`, the Flatpak manifest, `po/its/`, `scripts/i18n.sh`,
   `scripts/release.py`, `scripts/deb.sh`, `.github/` (workflows, issue templates) and
   `docs/CONTRIBUTING.md`.
+- Copied from Notav: the sidebar's folder tree in `memeplex/linux/app/src/window.rs`
+  (`refresh_tree`, `tree_row`, `toggle`, `INDENT`; a row picks the folder, its arrow opens it)
+  and `sorted` (Notav's `by_name`).
 - Never read or write the siblings' configuration, credentials, settings or databases.
 
 ## Shared code

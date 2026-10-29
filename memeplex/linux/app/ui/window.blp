@@ -3,34 +3,111 @@ using Adw 1;
 
 Adw.ApplicationWindow window {
   title: "Memeplex";
-  default-width: 900;
-  default-height: 700;
+  default-width: 1100;
+  default-height: 750;
 
-  content: Adw.ToolbarView {
-    [top]
-    Adw.HeaderBar {
-      [end]
-      MenuButton {
-        primary: true;
-        icon-name: "open-menu-symbolic";
-        tooltip-text: _("Main Menu");
-        menu-model: main_menu;
-      }
-    }
+  content: Adw.NavigationSplitView split {
+    min-sidebar-width: 220;
+    max-sidebar-width: 320;
 
-    content: Adw.StatusPage {
-      icon-name: "dev.aperte.Memeplex";
+    // The meme folder and the folders in it, as Notav's tree (src/window.rs `refresh_tree`).
+    sidebar: Adw.NavigationPage {
       title: "Memeplex";
-      description: _("Nothing here yet");
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          [start]
+          Gtk.Button {
+            icon-name: "folder-open-symbolic";
+            tooltip-text: _("Open Folder… (Ctrl+O)");
+            action-name: "win.open";
+          }
+
+          [end]
+          Gtk.MenuButton {
+            icon-name: "open-menu-symbolic";
+            menu-model: main_menu;
+            tooltip-text: _("Main Menu");
+            primary: true;
+          }
+        }
+
+        content: Gtk.ScrolledWindow {
+          vexpand: true;
+          hscrollbar-policy: never;
+
+          Gtk.ListBox tree {
+            styles ["navigation-sidebar"]
+          }
+        };
+      };
+    };
+
+    // The memes of the folder picked in the tree (src/window.rs `show_folder`).
+    content: Adw.NavigationPage content_page {
+      title: "Memeplex";
+
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {}
+
+        content: Gtk.Stack stack {
+          Gtk.StackPage {
+            name: "welcome";
+
+            child: Adw.StatusPage {
+              icon-name: "dev.aperte.Memeplex";
+              title: "Memeplex";
+              description: _("Open a folder with your memes to start");
+
+              Gtk.Button {
+                label: _("Open Folder…");
+                action-name: "win.open";
+                halign: center;
+                styles ["suggested-action", "pill"]
+              }
+            };
+          }
+
+          Gtk.StackPage {
+            name: "empty";
+
+            child: Adw.StatusPage {
+              icon-name: "folder-pictures-symbolic";
+              title: _("No Memes");
+              description: _("This folder has no pictures or videos");
+            };
+          }
+
+          Gtk.StackPage {
+            name: "grid";
+
+            child: Gtk.ScrolledWindow {
+              hscrollbar-policy: never;
+
+              Gtk.GridView grid {
+                max-columns: 30;
+                styles ["memes"]
+              }
+            };
+          }
+        };
+      };
     };
   };
+
+  Adw.Breakpoint {
+    condition ("max-width: 640sp")
+
+    setters {
+      split.collapsed: true;
+    }
+  }
 }
 
 menu main_menu {
-  section {
-    item {
-      label: _("_About Memeplex");
-      action: "app.about";
-    }
-  }
+  item (_("Open Folder…"), "win.open")
+  item (_("About Memeplex"), "app.about")
+  item (_("Quit"), "app.quit")
 }

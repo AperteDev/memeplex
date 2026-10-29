@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Memeplex\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
-"POT-Creation-Date: 2026-10-29 16:02+0100\n"
+"POT-Creation-Date: 2026-10-29 16:25+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,16 +17,40 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: memeplex/linux/app/ui/window.blp:16
+#: memeplex/linux/app/src/window.rs:123
+msgid "Open Meme Folder"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:23
+msgid "Open Folder… (Ctrl+O)"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:31
 msgid "Main Menu"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:24
-msgid "Nothing here yet"
+#: memeplex/linux/app/ui/window.blp:62
+msgid "Open a folder with your memes to start"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:32
-msgid "_About Memeplex"
+#: memeplex/linux/app/ui/window.blp:65 memeplex/linux/app/ui/window.blp:110
+msgid "Open Folder…"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:78
+msgid "No Memes"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:79
+msgid "This folder has no pictures or videos"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:111
+msgid "About Memeplex"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:112
+msgid "Quit"
 msgstr ""
 
 #: memeplex/linux/data/dev.aperte.Memeplex.desktop:2

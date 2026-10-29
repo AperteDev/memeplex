@@ -41,8 +41,9 @@ the same models and code.
 ## Linux app
 
 - GTK4 and libadwaita, Blueprint UI files, as in Todav and Notav.
-- A grid of thumbnails with search on top; a preview panel with the file's details, tags and
-  text; folders as a sidebar (#1).
+- Search on top of the grid; a preview panel with the file's details, tags and text.
+- Thumbnails of videos (a frame through GStreamer) in place of their icon.
+- More than one meme folder in the sidebar, kept by the core with the index.
 - GIF and video playback in the preview and, muted, on hover in the grid.
 - Copy to the clipboard (the image itself, not its path), drag and drop out into other apps,
   open with, show in folder.

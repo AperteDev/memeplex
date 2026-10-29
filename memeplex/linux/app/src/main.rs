@@ -1,6 +1,7 @@
 //! Memeplex for Linux: the GTK app.
 
 mod i18n;
+mod window;
 
 use adw::prelude::*;
 use gtk::{gio, glib};
@@ -19,16 +20,7 @@ fn main() -> glib::ExitCode {
             .build(),
     ]);
     app.set_accels_for_action("app.quit", &["<Control>q"]);
-    app.connect_activate(|app| {
-        if let Some(window) = app.active_window() {
-            window.present();
-            return;
-        }
-        let ui = gtk::Builder::from_string(include_str!(concat!(env!("OUT_DIR"), "/window.ui")));
-        let window: adw::ApplicationWindow = ui.object("window").expect("window in window.ui");
-        window.set_application(Some(app));
-        window.present();
-    });
+    app.connect_activate(window::present);
     app.run()
 }
 

@@ -1,11 +1,13 @@
 //! Translations through glibc's gettext with the `memeplex` domain (catalogs in `po/`, refreshed
 //! by `scripts/i18n.sh`). GtkBuilder translates the UI files through the domain set here.
 
-use std::ffi::{CString, c_char};
+use std::ffi::{CStr, CString, c_char};
 
 const DOMAIN: &str = "memeplex";
 
 unsafe extern "C" {
+    #[link_name = "gettext"]
+    fn c_gettext(msgid: *const c_char) -> *mut c_char;
     fn bindtextdomain(domain: *const c_char, dir: *const c_char) -> *mut c_char;
     fn bind_textdomain_codeset(domain: *const c_char, codeset: *const c_char) -> *mut c_char;
     fn textdomain(domain: *const c_char) -> *mut c_char;
@@ -13,6 +15,16 @@ unsafe extern "C" {
 
 fn c(s: &str) -> CString {
     CString::new(s).expect("no NUL in text")
+}
+
+/// The returned text is gettext's (or the argument itself): copy it before the next call.
+fn owned(p: *const c_char) -> String {
+    unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
+}
+
+pub fn gettext(msgid: &str) -> String {
+    let m = c(msgid);
+    owned(unsafe { c_gettext(m.as_ptr()) })
 }
 
 /// Use the user's locale and this app's catalogs; before any text is shown or built.
