@@ -6,183 +6,187 @@ Adw.ApplicationWindow window {
   default-width: 1100;
   default-height: 750;
 
-  content: Adw.NavigationSplitView split {
+  // A sidebar that hides (F9), as Todav's.
+  content: Adw.OverlaySplitView split {
     min-sidebar-width: 220;
     max-sidebar-width: 320;
 
     // The meme folder and the folders in it, as Notav's tree (src/window.rs `refresh_tree`).
-    sidebar: Adw.NavigationPage {
-      title: "Memeplex";
-
-      child: Adw.ToolbarView {
-        [top]
-        Adw.HeaderBar {
-          [start]
-          Gtk.Button {
-            icon-name: "folder-open-symbolic";
-            tooltip-text: _("Open Folder… (Ctrl+O)");
-            action-name: "win.open";
-          }
-
-          [end]
-          Gtk.MenuButton {
-            icon-name: "open-menu-symbolic";
-            menu-model: main_menu;
-            tooltip-text: _("Main Menu");
-            primary: true;
-          }
+    sidebar: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar {
+        [start]
+        Gtk.Button {
+          icon-name: "folder-open-symbolic";
+          tooltip-text: _("Open Folder… (Ctrl+O)");
+          action-name: "win.open";
         }
 
-        content: Gtk.ScrolledWindow {
-          vexpand: true;
-          hscrollbar-policy: never;
+        [end]
+        Gtk.MenuButton {
+          icon-name: "open-menu-symbolic";
+          menu-model: main_menu;
+          tooltip-text: _("Main Menu");
+          primary: true;
+        }
+      }
 
-          Gtk.ListBox tree {
-            styles ["navigation-sidebar"]
-          }
-        };
+      content: Gtk.ScrolledWindow {
+        vexpand: true;
+        hscrollbar-policy: never;
+
+        Gtk.ListBox tree {
+          styles ["navigation-sidebar"]
+        }
       };
     };
 
     // The memes of the folder picked in the tree (src/window.rs `show_folder`).
-    content: Adw.NavigationPage content_page {
-      title: "Memeplex";
+    content: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar {
+        title-widget: Adw.WindowTitle title {
+          title: "Memeplex";
+        };
 
-      child: Adw.ToolbarView {
-        [top]
-        Adw.HeaderBar {
-          [end]
-          Gtk.MenuButton {
-            icon-name: "view-grid-symbolic";
-            tooltip-text: _("View Options");
+        [start]
+        Gtk.ToggleButton {
+          icon-name: "sidebar-show-symbolic";
+          tooltip-text: _("Toggle Sidebar (F9)");
+          active: bind split.show-sidebar bidirectional;
+        }
 
-            // The builder sets the menu after the children: the size row is added to it in
-            // code (`size_box`).
-            popover: Gtk.PopoverMenu view_popover {
-              menu-model: view_menu;
+        [end]
+        Gtk.MenuButton {
+          icon-name: "view-grid-symbolic";
+          tooltip-text: _("View Options");
 
-              [size]
-              Gtk.Box size_box {
-                spacing: 6;
-                margin-start: 6;
-                margin-end: 6;
+          // The builder sets the menu after the children: the size row is added to it in code
+          // (`size_box`).
+          popover: Gtk.PopoverMenu view_popover {
+            menu-model: view_menu;
 
-                Gtk.Image {
-                  icon-name: "zoom-out-symbolic";
+            [size]
+            Gtk.Box size_box {
+              spacing: 6;
+              margin-start: 6;
+              margin-end: 6;
+
+              Gtk.Image {
+                icon-name: "zoom-out-symbolic";
+              }
+
+              // A thumbnail's side in pixels (src/window.rs `connect_size`).
+              Gtk.Scale size {
+                hexpand: true;
+                width-request: 180;
+                draw-value: false;
+                tooltip-text: _("Thumbnail Size");
+
+                adjustment: Gtk.Adjustment {
+                  lower: 80;
+                  upper: 400;
+                  value: 180;
+                  step-increment: 20;
+                  page-increment: 40;
+                };
+
+                accessibility {
+                  label: _("Thumbnail Size");
                 }
+              }
 
-                // A thumbnail's side in pixels (src/window.rs `connect_size`).
-                Gtk.Scale size {
-                  hexpand: true;
-                  width-request: 180;
-                  draw-value: false;
-                  tooltip-text: _("Thumbnail Size");
+              Gtk.Image {
+                icon-name: "zoom-in-symbolic";
+              }
+            }
+          };
+        }
+      }
 
-                  adjustment: Gtk.Adjustment {
-                    lower: 80;
-                    upper: 400;
-                    value: 180;
-                    step-increment: 20;
-                    page-increment: 40;
-                  };
+      content: Gtk.Overlay {
+        child: Gtk.Stack stack {
+          Gtk.StackPage {
+            name: "welcome";
 
-                  accessibility {
-                    label: _("Thumbnail Size");
-                  }
-                }
+            child: Adw.StatusPage {
+              icon-name: "dev.aperte.Memeplex";
+              title: "Memeplex";
+              description: _("Open a folder with your memes to start");
 
-                Gtk.Image {
-                  icon-name: "zoom-in-symbolic";
-                }
+              Gtk.Button {
+                label: _("Open Folder…");
+                action-name: "win.open";
+                halign: center;
+                styles ["suggested-action", "pill"]
               }
             };
           }
-        }
 
-        content: Gtk.Overlay {
-          child: Gtk.Stack stack {
-            Gtk.StackPage {
-              name: "welcome";
+          Gtk.StackPage {
+            name: "empty";
 
-              child: Adw.StatusPage {
-                icon-name: "dev.aperte.Memeplex";
-                title: "Memeplex";
-                description: _("Open a folder with your memes to start");
+            child: Adw.StatusPage {
+              icon-name: "folder-pictures-symbolic";
+              title: _("No Memes");
+              description: _("This folder has no pictures or videos");
+            };
+          }
 
-                Gtk.Button {
-                  label: _("Open Folder…");
-                  action-name: "win.open";
-                  halign: center;
-                  styles ["suggested-action", "pill"]
-                }
-              };
-            }
+          Gtk.StackPage {
+            name: "grid";
 
-            Gtk.StackPage {
-              name: "empty";
+            child: Gtk.ScrolledWindow {
+              hscrollbar-policy: never;
 
-              child: Adw.StatusPage {
-                icon-name: "folder-pictures-symbolic";
-                title: _("No Memes");
-                description: _("This folder has no pictures or videos");
-              };
-            }
-
-            Gtk.StackPage {
-              name: "grid";
-
-              child: Gtk.ScrolledWindow {
-                hscrollbar-policy: never;
-
-                Gtk.GridView grid {
-                  max-columns: 30;
-                  single-click-activate: true;
-                  styles ["memes"]
-                }
-              };
-            }
-          };
-
-          // A meme over the whole panel, GIFs and videos playing. It grows out of its thumbnail
-          // while the backdrop fades in over the grid, and back (src/window.rs `open_preview`,
-          // `animate_preview`).
-          [overlay]
-          Gtk.Overlay preview {
-            visible: false;
-
-            Gtk.Box preview_backdrop {
-              styles ["preview"]
-            }
-
-            // Its margins put it where the thumbnail is while it grows (`set_progress`).
-            [overlay]
-            Gtk.Stack preview_stack {
-              // Pictures, GIFs (playing, muted) among them.
-              Gtk.Picture preview_picture {
-                content-fit: contain;
+              Gtk.GridView grid {
+                max-columns: 30;
+                single-click-activate: true;
+                styles ["memes"]
               }
-
-              // Videos, with their controls.
-              Gtk.Video preview_video {
-                autoplay: true;
-                loop: true;
-              }
-            }
-
-            // On the side of the window's own close button (src/window.rs `place_close`).
-            [overlay]
-            Gtk.Button preview_close {
-              icon-name: "window-close-symbolic";
-              tooltip-text: _("Close Preview (Esc)");
-              action-name: "win.close-preview";
-              valign: start;
-              margin-start: 12;
-              margin-end: 12;
-              margin-top: 12;
-              styles ["osd", "circular"]
-            }
+            };
           }
         };
+
+        // A meme over the whole panel, GIFs and videos playing. It grows out of its thumbnail
+        // while the backdrop fades in over the grid, and back (src/window.rs `open_preview`,
+        // `animate_preview`).
+        [overlay]
+        Gtk.Overlay preview {
+          visible: false;
+
+          Gtk.Box preview_backdrop {
+            styles ["preview"]
+          }
+
+          // Its margins put it where the thumbnail is while it grows (`set_progress`).
+          [overlay]
+          Gtk.Stack preview_stack {
+            // Pictures, GIFs (playing, muted) among them.
+            Gtk.Picture preview_picture {
+              content-fit: contain;
+            }
+
+            // Videos, with their controls.
+            Gtk.Video preview_video {
+              autoplay: true;
+              loop: true;
+            }
+          }
+
+          // On the side of the window's own close button (src/window.rs `place_close`).
+          [overlay]
+          Gtk.Button preview_close {
+            icon-name: "window-close-symbolic";
+            tooltip-text: _("Close Preview (Esc)");
+            action-name: "win.close-preview";
+            valign: start;
+            margin-start: 12;
+            margin-end: 12;
+            margin-top: 12;
+            styles ["osd", "circular"]
+          }
+        }
       };
     };
   };
@@ -205,7 +209,6 @@ menu view_menu {
 }
 
 menu main_menu {
-  item (_("Open Folder…"), "win.open")
   item (_("About Memeplex"), "app.about")
   item (_("Quit"), "app.quit")
 }

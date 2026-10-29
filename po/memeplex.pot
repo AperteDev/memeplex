@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Memeplex\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
-"POT-Creation-Date: 2026-10-29 17:06+0100\n"
+"POT-Creation-Date: 2026-10-29 21:29+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,51 +17,55 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: memeplex/linux/app/src/window.rs:191
+#: memeplex/linux/app/src/window.rs:197
 msgid "Open Meme Folder"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:23
+#: memeplex/linux/app/ui/window.blp:21
 msgid "Open Folder… (Ctrl+O)"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:31
+#: memeplex/linux/app/ui/window.blp:29
 msgid "Main Menu"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:57
+#: memeplex/linux/app/ui/window.blp:55
+msgid "Toggle Sidebar (F9)"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:62
 msgid "View Options"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:79 memeplex/linux/app/ui/window.blp:90
+#: memeplex/linux/app/ui/window.blp:84 memeplex/linux/app/ui/window.blp:95
 msgid "Thumbnail Size"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:110
+#: memeplex/linux/app/ui/window.blp:115
 msgid "Open a folder with your memes to start"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:113 memeplex/linux/app/ui/window.blp:208
+#: memeplex/linux/app/ui/window.blp:118
 msgid "Open Folder…"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:126
+#: memeplex/linux/app/ui/window.blp:131
 msgid "No Memes"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:127
+#: memeplex/linux/app/ui/window.blp:132
 msgid "This folder has no pictures or videos"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:176
+#: memeplex/linux/app/ui/window.blp:181
 msgid "Close Preview (Esc)"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:209
+#: memeplex/linux/app/ui/window.blp:212
 msgid "About Memeplex"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:210
+#: memeplex/linux/app/ui/window.blp:213
 msgid "Quit"
 msgstr ""
 

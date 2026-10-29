@@ -23,8 +23,9 @@ const CSS: &str = "
 
 struct Ui {
     window: adw::ApplicationWindow,
-    split: adw::NavigationSplitView,
-    content_page: adw::NavigationPage,
+    split: adw::OverlaySplitView,
+    /// The content's title: the folder, or the meme previewed.
+    title: adw::WindowTitle,
     tree: gtk::ListBox,
     stack: gtk::Stack,
     /// The grid's memes, as paths in `gtk::StringObject`s.
@@ -105,7 +106,7 @@ pub fn present(app: &adw::Application) {
     let ui = Rc::new(Ui {
         window: get(&b, "window"),
         split: get(&b, "split"),
-        content_page: get(&b, "content_page"),
+        title: get(&b, "title"),
         tree: get(&b, "tree"),
         stack: get(&b, "stack"),
         memes: gio::ListStore::new::<gtk::StringObject>(),
@@ -162,6 +163,11 @@ pub fn present(app: &adw::Application) {
     });
     ui.window.add_action(&open);
     app.set_accels_for_action("win.open", &["<Control>o"]);
+    let toggle = gio::SimpleAction::new("toggle-sidebar", None);
+    let split = ui.split.clone();
+    toggle.connect_activate(move |_, _| split.set_show_sidebar(!split.shows_sidebar()));
+    ui.window.add_action(&toggle);
+    app.set_accels_for_action("win.toggle-sidebar", &["F9"]);
 
     connect_tree(&ui);
     // The builder sets the menu after its children: the size row is added here.
@@ -236,7 +242,7 @@ fn show_folder(ui: &Rc<Ui>, folder: String) {
     let memes = sorted(library::memes(&dir), |p| p);
     let items: Vec<_> = memes.iter().map(|p| gtk::StringObject::new(p)).collect();
     ui.memes.splice(0, ui.memes.n_items(), &items);
-    ui.content_page.set_title(name(&dir));
+    ui.title.set_title(name(&dir));
     ui.stack
         .set_visible_child_name(if memes.is_empty() { "empty" } else { "grid" });
 }
@@ -272,7 +278,10 @@ fn connect_tree(ui: &Rc<Ui>) {
         let Some(ui) = weak.upgrade() else {
             return;
         };
-        ui.split.set_show_content(true);
+        // An overlaid (collapsed) sidebar makes way for the memes.
+        if ui.split.is_collapsed() {
+            ui.split.set_show_sidebar(false);
+        }
         let folder = ui.rows.borrow()[row.index() as usize].clone();
         if !ui.expanded.borrow().contains(&folder) {
             // After the click, as that rebuilds the tree.
@@ -605,7 +614,7 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
     let p = &ui.preview;
     *p.path.borrow_mut() = Some(path.clone());
     p.gif.take();
-    ui.content_page.set_title(name(&path));
+    ui.title.set_title(name(&path));
     let video = library::kind(&path) == Some(Kind::Video);
     if video {
         p.video.set_filename(Some(&path));
@@ -639,7 +648,7 @@ fn close_preview(ui: &Rc<Ui>, to_thumbnail: bool) {
     }
     ui.preview.close_action.set_enabled(false);
     if let Some(dir) = selected_dir(ui) {
-        ui.content_page.set_title(name(&dir));
+        ui.title.set_title(name(&dir));
     }
     find_thumbnail(ui, to_thumbnail);
     animate_preview(ui, false);
