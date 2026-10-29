@@ -392,8 +392,12 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
     let weak = Rc::downgrade(ui);
     factory.connect_setup(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
-        item.set_child(Some(&gtk::Image::new()));
+        let image = gtk::Image::new();
+        item.set_child(Some(&image));
         if let Some(ui) = weak.upgrade() {
+            // Sized before it is bound: the grid counts how many cells fill the view by it,
+            // and made one for every meme while they measured nothing.
+            image.set_size_request(ui.size.get(), ui.size.get());
             ui.cells.borrow_mut().push(item.downgrade());
         }
     });
