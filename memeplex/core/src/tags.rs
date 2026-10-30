@@ -345,9 +345,16 @@ fn device(db: &Connection) -> Result<String> {
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos()),
     );
-    let id = format!("{:016x}", h.finish());
-    db.execute("INSERT INTO kv (key, value) VALUES ('device', ?1)", [&id])?;
-    Ok(id)
+    // Another connection may have made one meanwhile: that one stays.
+    db.execute(
+        "INSERT OR IGNORE INTO kv (key, value) VALUES ('device', ?1)",
+        [format!("{:016x}", h.finish())],
+    )?;
+    Ok(
+        db.query_row("SELECT value FROM kv WHERE key = 'device'", [], |r| {
+            r.get(0)
+        })?,
+    )
 }
 
 fn hex(bytes: &[u8]) -> String {
