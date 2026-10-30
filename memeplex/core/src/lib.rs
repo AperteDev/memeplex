@@ -2,6 +2,7 @@
 
 pub mod index;
 pub mod library;
+pub mod tags;
 
 #[derive(Debug)]
 pub enum Error {

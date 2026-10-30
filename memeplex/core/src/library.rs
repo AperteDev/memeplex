@@ -24,11 +24,16 @@ pub fn kind(path: &str) -> Option<Kind> {
     }
 }
 
-/// The folders under `root`, at any depth, relative to it with `/` between names.
+/// The folder of the tag files at the root of a meme folder (src/tags.rs): visible, as the
+/// Nextcloud client does not sync hidden files by default.
+pub const TAGS_DIR: &str = "Memeplex";
+
+/// The folders under `root`, at any depth, relative to it with `/` between names; not the tag
+/// files' folder.
 pub fn folders(root: &str) -> Vec<String> {
     let mut out = Vec::new();
     walk(Path::new(root), "", &mut |rel, is_dir| {
-        if is_dir {
+        if is_dir && rel != TAGS_DIR {
             out.push(rel.to_string());
         }
     });
@@ -97,7 +102,7 @@ mod tests {
     fn walks_visible_folders_and_memes() {
         let root = std::env::temp_dir().join(format!("memeplex-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
-        for dir in ["IT/Linux", ".hidden"] {
+        for dir in ["IT/Linux", ".hidden", TAGS_DIR] {
             fs::create_dir_all(root.join(dir)).unwrap();
         }
         for file in [

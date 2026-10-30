@@ -10,7 +10,8 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-const MIGRATIONS: &[&str] = &[r#"
+const MIGRATIONS: &[&str] = &[
+    r#"
 CREATE TABLE files (
   path TEXT PRIMARY KEY,                -- full path
   size INTEGER NOT NULL,
@@ -18,10 +19,34 @@ CREATE TABLE files (
   hash BLOB NOT NULL                    -- BLAKE3, 32 bytes: the meme's identity
 );
 CREATE INDEX files_hash ON files (hash);
-"#];
+"#,
+    // Tags (src/tags.rs): each tag file's lines as last read, and the tags they add up to.
+    r#"
+CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE tag_files (
+  path TEXT PRIMARY KEY,
+  size INTEGER NOT NULL,                -- as last read or written
+  mtime INTEGER NOT NULL
+);
+CREATE TABLE tag_lines (
+  file TEXT NOT NULL,                   -- the tag file's path
+  hash BLOB NOT NULL,
+  time INTEGER NOT NULL,                -- of the change, milliseconds since 1970
+  tags TEXT NOT NULL,                   -- tab-separated
+  PRIMARY KEY (file, hash)
+);
+CREATE INDEX tag_lines_hash ON tag_lines (hash);
+CREATE TABLE meme_tags (
+  hash BLOB NOT NULL,                   -- each meme's tags, from its newest line
+  tag TEXT NOT NULL,
+  PRIMARY KEY (hash, tag)
+);
+CREATE INDEX meme_tags_tag ON meme_tags (tag);
+"#,
+];
 
 pub struct Index {
-    db: Mutex<Connection>,
+    pub(crate) db: Mutex<Connection>,
 }
 
 impl Index {
@@ -62,15 +87,9 @@ impl Index {
         for path in library::memes(&root) {
             // Unreadable or gone since the walk: left out, as the walk leaves out what it
             // cannot read.
-            let Ok(meta) = fs::metadata(&path) else {
+            let Some((size, mtime)) = stat(&path) else {
                 continue;
             };
-            let size = meta.len() as i64;
-            let mtime = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map_or(0, |d| d.as_nanos() as i64);
             if known.remove(&path) == Some((size, mtime)) {
                 continue;
             }
@@ -92,6 +111,18 @@ impl Index {
         }
         Ok(hashed)
     }
+}
+
+/// The size and modification time (nanoseconds since 1970) of the file at `path`, as the index
+/// keeps them to tell whether it changed; `None` when it cannot be read.
+pub(crate) fn stat(path: &str) -> Option<(i64, i64)> {
+    let meta = fs::metadata(path).ok()?;
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_nanos() as i64);
+    Some((meta.len() as i64, mtime))
 }
 
 /// The BLAKE3 hash of the file at `path`.

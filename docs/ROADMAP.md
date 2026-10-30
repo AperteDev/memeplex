@@ -23,16 +23,6 @@ it, then copy, drag or share it. Issue numbers refer to GitHub issues.
   so they do not depend on where a file is. Added by hand or accepted from suggestions;
   favorites are a tag; recently used stays on each device, in the index. The file format is not
   a tag but a filter.
-- **Tag files**: in a visible `Memeplex/` folder at the root of the meme folder (the Nextcloud
-  client does not sync hidden files by default), skipped by the scan and the folder tree. Each
-  device writes only its own file, `tags-<device id>.tsv` (a random id made on first run), so
-  syncing never conflicts. A version line (`# memeplex tags 1`), then one line per meme:
-  hash, time of change, its tags (tab-separated, so tags hold no tabs or newlines); a meme
-  whose tags were all removed keeps its line with none. Reading merges every device's file, the
-  newest line of a meme winning. A file is read again only when its size or modification time
-  changes, and written a few seconds after the last change (and on quit), through a temporary
-  file renamed over it. About 2 MB for 20,000 memes; if uploading it whole after a change ever
-  costs too much, split each device's file in 16 by the hash's first digit.
 - **Background indexing**: one queue for thumbnails, OCR and embeddings, all files at once
   (#5), resumable, with progress; new files indexed as they appear.
 
