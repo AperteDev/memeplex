@@ -147,6 +147,11 @@ pub fn present(app: &adw::Application) {
     if crate::sandbox() {
         ui.window.set_title(Some("Memeplex (sandbox)"));
     }
+    // Libadwaita's stripes in the header: a debug build (`make sandbox`, `cargo run`), not one
+    // installed or packaged.
+    if cfg!(debug_assertions) {
+        ui.window.add_css_class("devel");
+    }
     let css = gtk::CssProvider::new();
     css.load_from_string(CSS);
     gtk::style_context_add_provider_for_display(
