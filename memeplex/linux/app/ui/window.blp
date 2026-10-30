@@ -8,13 +8,17 @@ Adw.ApplicationWindow window {
 
   // A sidebar that hides (F9), as Todav's.
   content: Adw.OverlaySplitView split {
-    min-sidebar-width: 220;
+    min-sidebar-width: 240;
     max-sidebar-width: 320;
 
-    // The meme folder and the folders in it, as Notav's tree (src/window.rs `refresh_tree`).
     sidebar: Adw.ToolbarView {
       [top]
       Adw.HeaderBar {
+        // As Todav's sidebar switcher.
+        title-widget: Adw.InlineViewSwitcher {
+          stack: sidebar_views;
+        };
+
         [start]
         Gtk.Button {
           icon-name: "folder-open-symbolic";
@@ -31,12 +35,36 @@ Adw.ApplicationWindow window {
         }
       }
 
-      content: Gtk.ScrolledWindow {
-        vexpand: true;
-        hscrollbar-policy: never;
+      content: Adw.ViewStack sidebar_views {
+        // All, Untagged, then the tags (src/window.rs `refresh_tags`).
+        Adw.ViewStackPage {
+          name: "tags";
+          title: _("Tags");
 
-        Gtk.ListBox tree {
-          styles ["navigation-sidebar"]
+          child: Gtk.ScrolledWindow {
+            vexpand: true;
+            hscrollbar-policy: never;
+
+            Gtk.ListBox tag_list {
+              styles ["navigation-sidebar"]
+            }
+          };
+        }
+
+        // The meme folder and the folders in it, as Notav's tree (src/window.rs
+        // `refresh_tree`).
+        Adw.ViewStackPage {
+          name: "folders";
+          title: _("Folders");
+
+          child: Gtk.ScrolledWindow {
+            vexpand: true;
+            hscrollbar-policy: never;
+
+            Gtk.ListBox tree {
+              styles ["navigation-sidebar"]
+            }
+          };
         }
       };
     };
@@ -126,10 +154,10 @@ Adw.ApplicationWindow window {
           Gtk.StackPage {
             name: "empty";
 
-            child: Adw.StatusPage {
+            // Its description is the group's (src/window.rs `show_group`).
+            child: Adw.StatusPage empty {
               icon-name: "folder-pictures-symbolic";
               title: _("No Memes");
-              description: _("This folder has no pictures or videos");
             };
           }
 
@@ -174,6 +202,30 @@ Adw.ApplicationWindow window {
             }
           }
 
+          // The meme's tags, each removed by a click, and one more typed in (src/window.rs
+          // `show_tags`), above the meme.
+          [overlay]
+          Gtk.Box preview_bar {
+            halign: center;
+            valign: start;
+            margin-top: 12;
+            spacing: 6;
+            styles ["toolbar", "osd", "tag-bar"]
+
+            Gtk.Box preview_tags {
+              spacing: 6;
+            }
+
+            Gtk.Entry preview_tag_entry {
+              placeholder-text: _("Add Tag…");
+              width-chars: 14;
+
+              accessibility {
+                label: _("Add Tag");
+              }
+            }
+          }
+
           // On the side of the window's own close button (src/window.rs `place_close`).
           [overlay]
           Gtk.Button preview_close {
@@ -209,6 +261,12 @@ menu view_menu {
 }
 
 menu main_menu {
-  item (_("About Memeplex"), "app.about")
-  item (_("Quit"), "app.quit")
+  section {
+    item (_("Use Folder Names as Tags…"), "win.tags-from-folders")
+  }
+
+  section {
+    item (_("About Memeplex"), "app.about")
+    item (_("Quit"), "app.quit")
+  }
 }

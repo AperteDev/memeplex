@@ -1,5 +1,5 @@
-//! Main window: the meme folder and its folders as a tree in the sidebar (as Notav's), and the
-//! memes of the folder picked in it as a grid of thumbnails.
+//! Main window: the meme folder's tags, or its folders as a tree (as Notav's), in the sidebar,
+//! and the memes of the group picked there as a grid of thumbnails.
 
 use crate::i18n::gettext;
 use crate::settings;
@@ -20,15 +20,38 @@ const INDENT: i32 = 16;
 const CSS: &str = "
 .memes > child { padding: 6px; border-radius: 12px; }
 .preview { background-color: var(--window-bg-color); }
+.tag-bar { border-radius: 12px; }
 ";
+
+/// Room above the meme in the preview, for its tags and the X button.
+const PREVIEW_TOP: f64 = 64.0;
+
+/// What the grid shows, picked in the sidebar.
+#[derive(Clone, Debug, PartialEq)]
+enum Group {
+    All,
+    Untagged,
+    Tag(String),
+    /// A folder relative to the root, "" for the root.
+    Folder(String),
+}
 
 struct Ui {
     window: adw::ApplicationWindow,
     split: adw::OverlaySplitView,
-    /// The content's title: the folder, or the meme previewed.
+    /// The content's title: the group, or the meme previewed.
     title: adw::WindowTitle,
+    /// What is known of the memes (hashes, tags); `None` if it could not be opened.
+    index: Option<Index>,
+    /// Saving this device's tag file, a few seconds after the last change.
+    save: RefCell<Option<glib::SourceId>>,
+    tag_list: gtk::ListBox,
+    /// The group of each row of the tag list, in order.
+    tag_rows: RefCell<Vec<Group>>,
     tree: gtk::ListBox,
     stack: gtk::Stack,
+    /// The grid's place while it has no memes.
+    empty: adw::StatusPage,
     /// The grid's memes, as paths in `gtk::StringObject`s.
     memes: gio::ListStore,
     /// The meme folder.
@@ -41,8 +64,8 @@ struct Ui {
     expanded: RefCell<HashSet<String>>,
     /// The folder of each row of the tree, in order.
     rows: RefCell<Vec<String>>,
-    /// The folder whose memes are shown.
-    selected: RefCell<String>,
+    /// The group whose memes are shown.
+    shown: RefCell<Group>,
     /// A thumbnail's side in the grid, as View Options sets it; the picture fits in it.
     size: Cell<i32>,
     /// The grid's cells, to resize when the size changes.
@@ -63,6 +86,10 @@ struct Preview {
     picture: gtk::Picture,
     video: gtk::Video,
     close: gtk::Button,
+    /// The meme's tags above it: one button each, and an entry for another.
+    bar: gtk::Box,
+    tags: gtk::Box,
+    tag_entry: gtk::Entry,
     /// `win.close-preview`, enabled while it is open: Esc goes elsewhere otherwise.
     close_action: gio::SimpleAction,
     /// The meme shown, `None` while closed (or closing), and its place in the grid.
@@ -72,7 +99,7 @@ struct Preview {
     /// end, bottom), `None` to fade in its place; its insets once grown; and how far grown it
     /// is, 0 to 1.
     from: Cell<Option<[f64; 4]>>,
-    inset: Cell<f64>,
+    inset: Cell<[f64; 4]>,
     progress: Cell<f64>,
     /// The thumbnail it grew from, hidden while it is open.
     source: RefCell<Option<gtk::Image>>,
@@ -108,15 +135,22 @@ pub fn present(app: &adw::Application) {
         window: get(&b, "window"),
         split: get(&b, "split"),
         title: get(&b, "title"),
+        index: Index::open(index_path())
+            .inspect_err(|e| eprintln!("Memeplex: opening the index failed: {e}"))
+            .ok(),
+        save: RefCell::default(),
+        tag_list: get(&b, "tag_list"),
+        tag_rows: RefCell::default(),
         tree: get(&b, "tree"),
         stack: get(&b, "stack"),
+        empty: get(&b, "empty"),
         memes: gio::ListStore::new::<gtk::StringObject>(),
         root: RefCell::default(),
         folders: RefCell::default(),
         counts: RefCell::default(),
         expanded: RefCell::default(),
         rows: RefCell::default(),
-        selected: RefCell::default(),
+        shown: RefCell::new(Group::All),
         size: Cell::new(0),
         cells: RefCell::default(),
         thumbs: Thumbs {
@@ -132,11 +166,14 @@ pub fn present(app: &adw::Application) {
             picture: get(&b, "preview_picture"),
             video: get(&b, "preview_video"),
             close: get(&b, "preview_close"),
+            bar: get(&b, "preview_bar"),
+            tags: get(&b, "preview_tags"),
+            tag_entry: get(&b, "preview_tag_entry"),
             close_action: gio::SimpleAction::new("close-preview", None),
             path: RefCell::default(),
             position: Cell::new(0),
             from: Cell::new(None),
-            inset: Cell::new(0.0),
+            inset: Cell::new([0.0; 4]),
             progress: Cell::new(0.0),
             source: RefCell::default(),
             gif: RefCell::default(),
@@ -174,7 +211,23 @@ pub fn present(app: &adw::Application) {
     toggle.connect_activate(move |_, _| split.set_show_sidebar(!split.shows_sidebar()));
     ui.window.add_action(&toggle);
     app.set_accels_for_action("win.toggle-sidebar", &["F9"]);
+    let from_folders = gio::SimpleAction::new("tags-from-folders", None);
+    let weak = Rc::downgrade(&ui);
+    from_folders.connect_activate(move |_, _| {
+        if let Some(ui) = weak.upgrade() {
+            ask_tags_from_folders(&ui);
+        }
+    });
+    ui.window.add_action(&from_folders);
+    // The last tag changes, saved before the app ends (closed or quit).
+    let weak = Rc::downgrade(&ui);
+    app.connect_shutdown(move |_| {
+        if let Some(ui) = weak.upgrade() {
+            save_now(&ui);
+        }
+    });
 
+    connect_tags(&ui);
     connect_tree(&ui);
     // The builder sets the menu after its children: the size row is added here.
     let size_box: gtk::Box = get(&b, "size_box");
@@ -224,53 +277,203 @@ fn saved_root() -> Option<String> {
     settings::get("folder").filter(|root| Path::new(root).is_dir())
 }
 
-/// Show `root`'s folders in the tree, and its memes.
+/// Show `root`'s tags and folders in the sidebar, and all its memes.
 fn open_root(ui: &Rc<Ui>, root: String) {
+    // The last folder's tag changes go to its tag file.
+    save_now(ui);
     let mut folders = library::folders(&root);
     folders.push(String::new());
     *ui.folders.borrow_mut() = folders;
     *ui.counts.borrow_mut() = library::counts(&root);
-    // The index, brought up to date off the UI thread: the first time it reads every meme.
-    let db = glib::user_data_dir().join("memeplex/index.sqlite");
-    let scanned = root.clone();
-    std::thread::spawn(move || {
-        if let Err(e) = Index::open(db.to_string_lossy().into_owned()).and_then(|i| i.scan(scanned))
-        {
-            eprintln!("Memeplex: indexing failed: {e}");
-        }
-    });
-    *ui.root.borrow_mut() = Some(root);
+    if let Some(index) = &ui.index
+        && let Err(e) = index.load_tags(root.clone())
+    {
+        eprintln!("Memeplex: reading the tags failed: {e}");
+    }
+    *ui.root.borrow_mut() = Some(root.clone());
     *ui.expanded.borrow_mut() = HashSet::from([String::new()]);
     ui.thumbs.made.borrow_mut().clear();
-    show_folder(ui, String::new());
+    show_group(ui, Group::All);
+    refresh_tags(ui);
     refresh_tree(ui);
+    // The first time it reads every meme; until then, those not hashed yet are neither tagged
+    // nor untagged.
+    in_background(ui, move |index| index.scan(root).map(|_| ()));
 }
 
-/// Show the memes of `folder` (relative to the root) and the folders in it.
-fn show_folder(ui: &Rc<Ui>, folder: String) {
-    // Faded out: its thumbnail is about to make way for another folder's.
+/// The index's file, in the data folder.
+fn index_path() -> String {
+    let path = glib::user_data_dir().join("memeplex/index.sqlite");
+    path.to_string_lossy().into_owned()
+}
+
+/// Runs `work` on the index off the UI thread, through a connection of its own, then shows the
+/// tags as they are now.
+fn in_background(
+    ui: &Rc<Ui>,
+    work: impl FnOnce(&Index) -> memeplex_core::Result<()> + Send + 'static,
+) {
+    let done = gio::spawn_blocking(move || Index::open(index_path()).and_then(|i| work(&i)));
+    let weak = Rc::downgrade(ui);
+    glib::spawn_future_local(async move {
+        if let Ok(Err(e)) = done.await {
+            eprintln!("Memeplex: indexing failed: {e}");
+        }
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        refresh_tags(&ui);
+        // Memes may have joined it, unless one is open over it.
+        let shown = ui.shown.borrow().clone();
+        if shown == Group::Untagged && ui.preview.path.borrow().is_none() {
+            show_group(&ui, shown);
+        }
+    });
+}
+
+/// Show the memes of `group`.
+fn show_group(ui: &Rc<Ui>, group: Group) {
+    // Faded out: its thumbnail is about to make way for another group's.
     close_preview(ui, false);
-    *ui.selected.borrow_mut() = folder;
-    let Some(dir) = selected_dir(ui) else {
+    *ui.shown.borrow_mut() = group.clone();
+    let Some(root) = ui.root.borrow().clone() else {
         return;
     };
-    let memes = sorted(library::memes(&dir), |p| p);
+    let memes = match &group {
+        Group::All => library::memes(&root),
+        Group::Folder(folder) => library::memes(&folder_dir(&root, folder)),
+        Group::Untagged => indexed(ui, |i| i.untagged(root.clone())),
+        Group::Tag(tag) => indexed(ui, |i| i.tagged(root.clone(), tag.clone())),
+    };
+    let memes = sorted(memes, |p| p);
     let items: Vec<_> = memes.iter().map(|p| gtk::StringObject::new(p)).collect();
     ui.memes.splice(0, ui.memes.n_items(), &items);
-    ui.title.set_title(name(&dir));
+    ui.title.set_title(&group_title(ui));
+    ui.empty.set_description(Some(&if group == Group::Untagged {
+        gettext("Every meme has a tag")
+    } else {
+        gettext("This folder has no pictures or videos")
+    }));
     ui.stack
         .set_visible_child_name(if memes.is_empty() { "empty" } else { "grid" });
+    // Picked in one list: the other's pick goes.
+    if matches!(group, Group::Folder(_)) {
+        ui.tag_list.unselect_all();
+    } else {
+        ui.tree.unselect_all();
+    }
 }
 
-/// The full path of the folder whose memes are shown.
-fn selected_dir(ui: &Ui) -> Option<String> {
-    let root = ui.root.borrow().clone()?;
-    let folder = ui.selected.borrow();
-    Some(if folder.is_empty() {
-        root
+/// The memes `query` finds in the index, none without it.
+fn indexed(
+    ui: &Ui,
+    query: impl FnOnce(&Index) -> memeplex_core::Result<Vec<String>>,
+) -> Vec<String> {
+    let Some(index) = &ui.index else {
+        return Vec::new();
+    };
+    query(index).unwrap_or_else(|e| {
+        eprintln!("Memeplex: reading the index failed: {e}");
+        Vec::new()
+    })
+}
+
+/// The title of the group shown.
+fn group_title(ui: &Ui) -> String {
+    match &*ui.shown.borrow() {
+        Group::All => gettext("All Memes"),
+        Group::Untagged => gettext("Untagged"),
+        Group::Tag(tag) => tag.clone(),
+        Group::Folder(folder) => {
+            let root = ui.root.borrow().clone().unwrap_or_default();
+            name(&folder_dir(&root, folder)).to_string()
+        }
+    }
+}
+
+/// The full path of `folder` (relative to `root`).
+fn folder_dir(root: &str, folder: &str) -> String {
+    if folder.is_empty() {
+        root.to_string()
     } else {
         format!("{root}/{folder}")
-    })
+    }
+}
+
+/// The overlaid sidebar of a narrow window makes way for the memes picked in it.
+fn show_content(ui: &Ui) {
+    if ui.split.is_collapsed() {
+        ui.split.set_show_sidebar(false);
+    }
+}
+
+fn connect_tags(ui: &Rc<Ui>) {
+    let weak = Rc::downgrade(ui);
+    ui.tag_list.connect_row_selected(move |_, row| {
+        let (Some(ui), Some(row)) = (weak.upgrade(), row) else {
+            return;
+        };
+        let group = ui.tag_rows.borrow().get(row.index() as usize).cloned();
+        if let Some(group) = group
+            && group != *ui.shown.borrow()
+        {
+            show_group(&ui, group);
+        }
+    });
+    let weak = Rc::downgrade(ui);
+    ui.tag_list.connect_row_activated(move |_, _| {
+        if let Some(ui) = weak.upgrade() {
+            show_content(&ui);
+        }
+    });
+    // A line between All and Untagged and the tags.
+    ui.tag_list.set_header_func(|row, _| {
+        row.set_header(
+            (row.index() == 2)
+                .then(|| gtk::Separator::new(gtk::Orientation::Horizontal))
+                .as_ref(),
+        );
+    });
+}
+
+/// Rebuild the tag list: All, Untagged, then the tags by name, each with its count.
+fn refresh_tags(ui: &Rc<Ui>) {
+    let Some(root) = ui.root.borrow().clone() else {
+        return;
+    };
+    let counts = ui
+        .index
+        .as_ref()
+        .map(|i| i.tag_counts(root.clone()))
+        .transpose()
+        .unwrap_or_else(|e| {
+            eprintln!("Memeplex: reading the tags failed: {e}");
+            None
+        })
+        .unwrap_or_default();
+    let counts: HashMap<String, u64> = counts.into_iter().map(|c| (c.tag, c.count)).collect();
+    let all = ui.counts.borrow().get("").copied().unwrap_or(0);
+    let untagged = indexed(ui, |i| i.untagged(root.clone())).len() as u64;
+    let mut rows = vec![
+        (Group::All, gettext("All Memes"), all),
+        (Group::Untagged, gettext("Untagged"), untagged),
+    ];
+    for tag in sorted(counts.keys().cloned().collect(), |t| t) {
+        rows.push((Group::Tag(tag.clone()), tag.clone(), counts[&tag]));
+    }
+
+    // Before the rows, which are selected as they are added.
+    *ui.tag_rows.borrow_mut() = rows.iter().map(|(g, _, _)| g.clone()).collect();
+    ui.tag_list.remove_all();
+    for (group, text, count) in rows {
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+        line.set_margin_start(4);
+        let row = sidebar_row(line, &text, count);
+        ui.tag_list.append(&row);
+        if group == *ui.shown.borrow() {
+            ui.tag_list.select_row(Some(&row));
+        }
+    }
 }
 
 fn connect_tree(ui: &Rc<Ui>) {
@@ -281,10 +484,10 @@ fn connect_tree(ui: &Rc<Ui>) {
             return;
         };
         let folder = ui.rows.borrow().get(row.index() as usize).cloned();
-        if let Some(folder) = folder
-            && folder != *ui.selected.borrow()
+        if let Some(folder) = folder.map(Group::Folder)
+            && folder != *ui.shown.borrow()
         {
-            show_folder(&ui, folder);
+            show_group(&ui, folder);
         }
     });
     let weak = Rc::downgrade(ui);
@@ -293,10 +496,7 @@ fn connect_tree(ui: &Rc<Ui>) {
         let Some(ui) = weak.upgrade() else {
             return;
         };
-        // An overlaid (collapsed) sidebar makes way for the memes.
-        if ui.split.is_collapsed() {
-            ui.split.set_show_sidebar(false);
-        }
+        show_content(&ui);
         let folder = ui.rows.borrow()[row.index() as usize].clone();
         if !ui.expanded.borrow().contains(&folder) {
             // After the click, as that rebuilds the tree.
@@ -362,7 +562,7 @@ fn refresh_tree(ui: &Rc<Ui>) {
                 .then(|| expanded.contains(folder)),
         );
         ui.tree.append(&row);
-        if *folder == *ui.selected.borrow() {
+        if *ui.shown.borrow() == Group::Folder(folder.clone()) {
             ui.tree.select_row(Some(&row));
         }
     }
@@ -407,12 +607,20 @@ fn tree_row(
     } else {
         "folder-symbolic"
     }));
-    let label = gtk::Label::new(Some(name(path)));
+    let count = ui.counts.borrow().get(folder).copied().unwrap_or(0);
+    let row = sidebar_row(line, name(path), count);
+    row.set_tooltip_text(Some(path));
+    row
+}
+
+/// A row of the sidebar: what `line` starts with (an arrow, an icon), `text`, and `count`
+/// dimmed at its end.
+fn sidebar_row(line: gtk::Box, text: &str, count: u64) -> gtk::ListBoxRow {
+    let label = gtk::Label::new(Some(text));
     label.set_xalign(0.0);
     label.set_ellipsize(gtk::pango::EllipsizeMode::End);
     label.set_hexpand(true);
     line.append(&label);
-    let count = ui.counts.borrow().get(folder).copied().unwrap_or(0);
     let count = gtk::Label::new(Some(&count.to_string()));
     count.add_css_class("dim-label");
     count.add_css_class("numeric");
@@ -420,8 +628,7 @@ fn tree_row(
     line.append(&count);
     let row = gtk::ListBoxRow::new();
     row.set_child(Some(&line));
-    row.set_tooltip_text(Some(path));
-    row.update_property(&[gtk::accessible::Property::Label(name(path))]);
+    row.update_property(&[gtk::accessible::Property::Label(text)]);
     row
 }
 
@@ -594,6 +801,20 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
     });
     ui.window.add_action(close);
     app.set_accels_for_action("win.close-preview", &["Escape"]);
+    // Enter adds the tag typed (or several, between commas).
+    let weak = Rc::downgrade(ui);
+    ui.preview.tag_entry.connect_activate(move |entry| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        let text = entry.text();
+        let typed = text.split(',').map(|t| t.trim().to_string());
+        let mut tags = meme_tags(&ui);
+        tags.extend(typed.filter(|t| !t.is_empty()));
+        if change_tags(&ui, tags) {
+            entry.set_text("");
+        }
+    });
 
     place_close(ui);
     if let Some(settings) = gtk::Settings::default() {
@@ -643,8 +864,12 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
             load_picture(ui, &path);
         }
     }
-    // Pictures keep a little room around them; videos fill the panel, controls at its foot.
-    p.inset.set(if video { 0.0 } else { 12.0 });
+    // Room above for the tags; pictures keep a little around them too, videos fill the rest of
+    // the panel, controls at its foot.
+    let side = if video { 0.0 } else { 12.0 };
+    p.inset.set([side, PREVIEW_TOP, side, side]);
+    p.tag_entry.set_text("");
+    show_tags(ui);
     find_thumbnail(ui, true);
     p.close_action.set_enabled(true);
     if !p.root.is_visible() {
@@ -662,9 +887,7 @@ fn close_preview(ui: &Rc<Ui>, to_thumbnail: bool) {
         return;
     }
     ui.preview.close_action.set_enabled(false);
-    if let Some(dir) = selected_dir(ui) {
-        ui.title.set_title(name(&dir));
-    }
+    ui.title.set_title(&group_title(ui));
     find_thumbnail(ui, to_thumbnail);
     animate_preview(ui, false);
 }
@@ -724,20 +947,22 @@ fn thumbnail_insets(ui: &Ui, position: u32) -> Option<([f64; 4], gtk::Image)> {
     Some(([start, top, end, bottom], image))
 }
 
-/// The preview `v` of the way from its thumbnail (0) to the whole panel (1): the backdrop and
-/// the X button fade in as the meme grows, or fades in from a little smaller without one.
+/// The preview `v` of the way from its thumbnail (0) to the whole panel (1): the backdrop, the
+/// tags and the X button fade in as the meme grows, or fades in from a little smaller without
+/// one.
 fn set_progress(ui: &Ui, v: f64) {
     let p = &ui.preview;
     p.progress.set(v);
     p.backdrop.set_opacity(v);
     p.close.set_opacity(v);
+    p.bar.set_opacity(v);
     let to = p.inset.get();
     let (from, opacity) = match p.from.get() {
         Some(from) => (from, 1.0),
-        None => ([to + 48.0; 4], v),
+        None => (to.map(|t| t + 48.0), v),
     };
     p.stack.set_opacity(opacity);
-    let margin = |i: usize| (from[i] + (to - from[i]) * v).max(0.0).round() as i32;
+    let margin = |i: usize| (from[i] + (to[i] - from[i]) * v).max(0.0).round() as i32;
     p.stack.set_margin_start(margin(0));
     p.stack.set_margin_top(margin(1));
     p.stack.set_margin_end(margin(2));
@@ -838,6 +1063,144 @@ fn load_picture(ui: &Rc<Ui>, path: &str) {
             ui.preview.picture.set_paintable(Some(&texture));
         }
     });
+}
+
+/// The tags of the meme in the preview.
+fn meme_tags(ui: &Ui) -> Vec<String> {
+    let Some(path) = ui.preview.path.borrow().clone() else {
+        return Vec::new();
+    };
+    indexed(ui, |i| i.tags(path))
+}
+
+/// Show the tags of the meme in the preview above it, each a button that removes it.
+/// ponytail: no suggestions while typing; a popover of the tags that match when typos pile up.
+fn show_tags(ui: &Rc<Ui>) {
+    let p = &ui.preview;
+    while let Some(child) = p.tags.first_child() {
+        p.tags.remove(&child);
+    }
+    for tag in sorted(meme_tags(ui), |t| t) {
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        line.append(&gtk::Label::new(Some(&tag)));
+        line.append(&gtk::Image::from_icon_name("window-close-symbolic"));
+        let button = gtk::Button::builder().child(&line).build();
+        let remove = gettext("Remove “{tag}”").replace("{tag}", &tag);
+        button.set_tooltip_text(Some(&remove));
+        button.update_property(&[gtk::accessible::Property::Label(&remove)]);
+        let weak = Rc::downgrade(ui);
+        button.connect_clicked(move |_| {
+            if let Some(ui) = weak.upgrade() {
+                let tags = meme_tags(&ui).into_iter().filter(|t| *t != tag).collect();
+                change_tags(&ui, tags);
+                ui.preview.tag_entry.grab_focus();
+            }
+        });
+        p.tags.append(&button);
+    }
+    p.tags.set_visible(p.tags.first_child().is_some());
+}
+
+/// Give the meme in the preview `tags`, saved to the tag file a few seconds later. Returns
+/// whether it could: not before the meme is hashed, which the entry shows.
+fn change_tags(ui: &Rc<Ui>, tags: Vec<String>) -> bool {
+    let (Some(path), Some(root), Some(index)) = (
+        ui.preview.path.borrow().clone(),
+        ui.root.borrow().clone(),
+        &ui.index,
+    ) else {
+        return false;
+    };
+    let entry = &ui.preview.tag_entry;
+    match index.set_tags(root, path, tags) {
+        Ok(true) => {
+            entry.remove_css_class("error");
+            entry.set_tooltip_text(None);
+            show_tags(ui);
+            refresh_tags(ui);
+            save_later(ui);
+            true
+        }
+        Ok(false) => {
+            entry.add_css_class("error");
+            entry.set_tooltip_text(Some(&gettext(
+                "Still reading this meme, try again in a moment",
+            )));
+            false
+        }
+        Err(e) => {
+            eprintln!("Memeplex: changing the tags failed: {e}");
+            false
+        }
+    }
+}
+
+/// Save this device's tag file a few seconds after the last change, as a sync client uploads it
+/// whole each time.
+fn save_later(ui: &Rc<Ui>) {
+    if let Some(pending) = ui.save.take() {
+        pending.remove();
+    }
+    let weak = Rc::downgrade(ui);
+    let pending = glib::timeout_add_seconds_local_once(3, move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.save.take(); // run: nothing to remove
+            save_tags(&ui);
+        }
+    });
+    *ui.save.borrow_mut() = Some(pending);
+}
+
+/// Save this device's tag file now if a change waits for it.
+fn save_now(ui: &Ui) {
+    if let Some(pending) = ui.save.take() {
+        pending.remove();
+        save_tags(ui);
+    }
+}
+
+fn save_tags(ui: &Ui) {
+    if let (Some(root), Some(index)) = (ui.root.borrow().clone(), &ui.index)
+        && let Err(e) = index.save_tags(root)
+    {
+        eprintln!("Memeplex: saving the tags failed: {e}");
+    }
+}
+
+/// Ask before giving every meme the names of its folders as tags, then do it in the background
+/// (after the scan, so every meme is hashed).
+fn ask_tags_from_folders(ui: &Rc<Ui>) {
+    let Some(root) = ui.root.borrow().clone() else {
+        return;
+    };
+    let dialog = adw::AlertDialog::new(
+        Some(&gettext("Use Folder Names as Tags?")),
+        Some(&gettext(
+            "Each meme gets the names of the folders it is in as tags, besides those it has.",
+        )),
+    );
+    dialog.add_responses(&[
+        ("cancel", &gettext("Cancel")),
+        ("tag", &gettext("Add Tags")),
+    ]);
+    dialog.set_response_appearance("tag", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("tag"));
+    dialog.set_close_response("cancel");
+    let weak = Rc::downgrade(ui);
+    dialog.connect_response(Some("tag"), move |_, _| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        // Changes waiting are written first, so that file holds both.
+        save_now(&ui);
+        let root = root.clone();
+        in_background(&ui, move |index| {
+            index.scan(root.clone())?;
+            index.tags_from_folders(root.clone())?;
+            index.save_tags(root)
+        });
+    });
+    dialog.present(Some(&ui.window));
 }
 
 /// The last name of a path.

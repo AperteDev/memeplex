@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Memeplex\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
-"POT-Creation-Date: 2026-10-29 21:29+0100\n"
+"POT-Creation-Date: 2026-10-30 10:20+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,55 +17,114 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: memeplex/linux/app/src/window.rs:197
+#: memeplex/linux/app/src/window.rs:256
 msgid "Open Meme Folder"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:21
-msgid "Open Folder… (Ctrl+O)"
+#: memeplex/linux/app/src/window.rs:353
+msgid "Every meme has a tag"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:29
-msgid "Main Menu"
-msgstr ""
-
-#: memeplex/linux/app/ui/window.blp:55
-msgid "Toggle Sidebar (F9)"
-msgstr ""
-
-#: memeplex/linux/app/ui/window.blp:62
-msgid "View Options"
-msgstr ""
-
-#: memeplex/linux/app/ui/window.blp:84 memeplex/linux/app/ui/window.blp:95
-msgid "Thumbnail Size"
-msgstr ""
-
-#: memeplex/linux/app/ui/window.blp:115
-msgid "Open a folder with your memes to start"
-msgstr ""
-
-#: memeplex/linux/app/ui/window.blp:118
-msgid "Open Folder…"
-msgstr ""
-
-#: memeplex/linux/app/ui/window.blp:131
-msgid "No Memes"
-msgstr ""
-
-#: memeplex/linux/app/ui/window.blp:132
+#: memeplex/linux/app/src/window.rs:355
 msgid "This folder has no pictures or videos"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:181
+#: memeplex/linux/app/src/window.rs:384 memeplex/linux/app/src/window.rs:458
+msgid "All Memes"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:385 memeplex/linux/app/src/window.rs:459
+msgid "Untagged"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1088
+#, rust-format
+msgid "Remove “{tag}”"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1127
+msgid "Still reading this meme, try again in a moment"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1177
+msgid "Use Folder Names as Tags?"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1179
+msgid ""
+"Each meme gets the names of the folders it is in as tags, besides those it "
+"has."
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1183
+msgid "Cancel"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1184
+msgid "Add Tags"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:25
+msgid "Open Folder… (Ctrl+O)"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:33
+msgid "Main Menu"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:42
+msgid "Tags"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:58
+msgid "Folders"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:83
+msgid "Toggle Sidebar (F9)"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:90
+msgid "View Options"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:112 memeplex/linux/app/ui/window.blp:123
+msgid "Thumbnail Size"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:143
+msgid "Open a folder with your memes to start"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:146
+msgid "Open Folder…"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:160
+msgid "No Memes"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:220
+msgid "Add Tag…"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:224
+msgid "Add Tag"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:233
 msgid "Close Preview (Esc)"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:212
+#: memeplex/linux/app/ui/window.blp:265
+msgid "Use Folder Names as Tags…"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:269
 msgid "About Memeplex"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:213
+#: memeplex/linux/app/ui/window.blp:270
 msgid "Quit"
 msgstr ""
 

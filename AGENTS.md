@@ -46,7 +46,8 @@
   `memeplex/linux/Makefile`, the Flatpak manifest, `po/its/`, `scripts/i18n.sh`,
   `scripts/release.py`, `scripts/deb.sh`, `.github/` (workflows, issue templates),
   `docs/CONTRIBUTING.md`, and the hiding sidebar (`Adw.OverlaySplitView` with its toggle
-  button in `window.blp`, `win.toggle-sidebar` on F9 in `src/window.rs`).
+  button in `window.blp`, `win.toggle-sidebar` on F9 in `src/window.rs`) with its view
+  switcher in the header (`Adw.InlineViewSwitcher`, Tags and Folders).
 - Copied from Notav: the sidebar's folder tree in `memeplex/linux/app/src/window.rs`
   (`refresh_tree`, `tree_row` with its dimmed count, `toggle`, `INDENT`; unlike Notav, a click
   on a row picks the folder and opens it, its arrow opens or closes it; the counts come from

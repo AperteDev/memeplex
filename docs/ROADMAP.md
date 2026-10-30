@@ -19,10 +19,8 @@ it, then copy, drag or share it. Issue numbers refer to GitHub issues.
   `unidecode`), combined with smart search (see [AI](#ai)). FTS5 does not fold `ł` (a letter of
   its own in Unicode), so the core folds text itself before indexing and searching, as Todav's
   folding.
-- **Tags**, the main way memes are grouped: flat (no nesting), any number per meme, kept by hash
-  so they do not depend on where a file is. Added by hand or accepted from suggestions;
-  favorites are a tag; recently used stays on each device, in the index. The file format is not
-  a tag but a filter.
+- **Tags** (by hand already): accepted from suggestions; favorites are a tag; recently used
+  stays on each device, in the index. The file format is not a tag but a filter.
 - **Background indexing**: one queue for thumbnails, OCR and embeddings, all files at once
   (#5), resumable, with progress; new files indexed as they appear.
 
@@ -48,11 +46,10 @@ the same models and code.
 ## Linux app
 
 - GTK4 and libadwaita, Blueprint UI files, as in Todav and Notav.
-- Sidebar with two views, Tags (the default) and Folders (the tree as it is), switched as in
-  Todav's sidebar. Tags: All, Favorites, Recent, Untagged (memes still to sort), then the tags,
-  each with its dimmed count; one tag picked at a time, combined ones through search.
-- Tagging from the preview and on several thumbnails selected at once; a one-time "Use Folder
-  Names as Tags" to start from the folders.
+- Favorites and Recent in the Tags view, after All; combined tags through search.
+- Tagging several thumbnails selected at once; the tags that match suggested while typing one.
+- Tag files changed by another device read as they sync (a file monitor on `Memeplex/`), not
+  only when the folder opens.
 - A filter by format (pictures, GIFs, videos) in View Options.
 - Search on top of the grid; the file's details, tags and text next to the preview.
 - Thumbnails of videos (a frame through GStreamer) in place of their icon.
