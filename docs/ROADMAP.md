@@ -56,8 +56,8 @@ the same models and code.
 - More than one meme folder in the sidebar, kept by the core with the index.
 - GIFs and videos playing, muted, on hover in the grid; animated WebP playing in the preview
   (it shows its first frame).
-- Copy to the clipboard (the image itself, not its path), drag and drop out into other apps,
-  open with, show in folder.
+- Copy to the clipboard (the image itself, not its path), open with, show in folder. Dragged out
+  of the grid, a meme is its file: whether chat apps that want the image itself need it too.
 - Packaging: Flatpak on Flathub (#6), AUR, and the others Todav ships.
 
 ## Android app

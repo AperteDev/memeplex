@@ -16,11 +16,14 @@ use std::sync::{Arc, Mutex};
 /// How far each folder level is indented in the tree, and the width of a folder's arrow.
 const INDENT: i32 = 16;
 
-/// The preview hides the grid under it once faded in.
+/// The preview hides the grid under it once faded in. A tag a meme is dragged over is outlined
+/// in the accent color, as Todav's lists (GTK's own drop highlight off).
 const CSS: &str = "
 .memes > child { padding: 6px; border-radius: 12px; }
 .preview { background-color: var(--window-bg-color); }
 .tag-bar { border-radius: 12px; }
+:drop(active) { box-shadow: none; outline: none; }
+row.tag-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
 ";
 
 /// Room above the meme in the preview, for its tags and the X button.
@@ -469,10 +472,74 @@ fn refresh_tags(ui: &Rc<Ui>) {
         let line = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         line.set_margin_start(4);
         let row = sidebar_row(line, &text, count);
+        if let Group::Tag(tag) = &group {
+            row.add_controller(tag_drop(ui, tag));
+            row.add_css_class("tag-drop");
+        }
         ui.tag_list.append(&row);
         if group == *ui.shown.borrow() {
             ui.tag_list.select_row(Some(&row));
         }
+    }
+}
+
+/// A tag's row takes memes dropped on it (dragged from the grid, or files from elsewhere in the
+/// meme folder) and gives them the tag.
+fn tag_drop(ui: &Rc<Ui>, tag: &str) -> gtk::DropTarget {
+    let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+    let (weak, tag) = (Rc::downgrade(ui), tag.to_string());
+    drop.connect_drop(move |_, value, _, _| {
+        let (Some(ui), Ok(files)) = (weak.upgrade(), value.get::<gdk::FileList>()) else {
+            return false;
+        };
+        let paths = files.files().into_iter().filter_map(|f| f.path());
+        let paths: Vec<String> = paths.map(|p| p.to_string_lossy().into_owned()).collect();
+        let tag = tag.clone();
+        // After the drop: the rows it lands on are made again.
+        glib::idle_add_local_once(move || add_tag(&ui, paths, tag));
+        true
+    });
+    drop
+}
+
+/// Give the memes at `paths` `tag` besides theirs; those not hashed yet, or not under the meme
+/// folder, are left as they are. Memes no longer untagged leave Untagged, if it is shown.
+fn add_tag(ui: &Rc<Ui>, paths: Vec<String>, tag: String) {
+    let (Some(root), Some(index)) = (ui.root.borrow().clone(), &ui.index) else {
+        return;
+    };
+    let mut changed = false;
+    for path in paths {
+        let mut tags = indexed(ui, |i| i.tags(path.clone()));
+        tags.push(tag.clone());
+        match index.set_tags(root.clone(), path.clone(), tags) {
+            Ok(true) => changed = true,
+            Ok(false) => continue,
+            Err(e) => {
+                eprintln!("Memeplex: changing the tags failed: {e}");
+                continue;
+            }
+        }
+        if *ui.shown.borrow() == Group::Untagged
+            && let Some(at) = (0..ui.memes.n_items()).find(|&i| {
+                ui.memes
+                    .item(i)
+                    .and_downcast::<gtk::StringObject>()
+                    .is_some_and(|s| s.string() == path)
+            })
+        {
+            ui.memes.remove(at);
+        }
+    }
+    if changed {
+        if ui.memes.n_items() == 0 {
+            ui.stack.set_visible_child_name("empty");
+        }
+        if ui.preview.path.borrow().is_some() {
+            show_tags(ui);
+        }
+        refresh_tags(ui);
+        save_later(ui);
     }
 }
 
@@ -686,6 +753,16 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
         let image = gtk::Image::new();
         item.set_child(Some(&image));
+        // Dragged as its file: onto a tag in the sidebar, or out into other apps.
+        let drag = gtk::DragSource::new();
+        drag.set_actions(gdk::DragAction::COPY);
+        let cell = item.downgrade();
+        drag.connect_prepare(move |_, _, _| {
+            let path = cell.upgrade().as_ref().and_then(path_of)?;
+            let files = gdk::FileList::from_array(&[gio::File::for_path(path)]);
+            Some(gdk::ContentProvider::for_value(&files.to_value()))
+        });
+        image.add_controller(drag);
         if let Some(ui) = weak.upgrade() {
             // Sized before it is bound: the grid counts how many cells fill the view by it,
             // and made one for every meme while they measured nothing.

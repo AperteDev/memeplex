@@ -25,7 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sort) and the tags, each with its count; the folder tree moved to its second view, Folders.
   The preview shows the meme's tags above it: Enter adds the ones typed in (several between
   commas), a click on one removes it. "Use Folder Names as Tags…" in the main menu tags every
-  meme with the folders it is in. Tags are saved in a `Memeplex` folder in the meme folder,
+  meme with the folders it is in. A thumbnail dragged onto a tag in the sidebar gets that tag
+  (and leaves Untagged, if that is shown); dragged elsewhere, it is the meme's file, for other
+  apps to take. Tags are saved in a `Memeplex` folder in the meme folder,
   one file for each device, so a folder synced to other devices (Nextcloud) brings its tags
   along without conflicts.
 
