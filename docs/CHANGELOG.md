@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   thumbnails' size and a check to play GIFs and videos in the grid (off by default), both kept
   on this device. Videos show a frame in the grid, taken through GStreamer. The sidebar hides and shows again with the button at the left of the grid's header
   (F9).
+- Linux: thumbnails show their format (GIF, MP4…) in a corner of the picture, so a still frame of
+  a GIF or a video is told apart. Preferences (Ctrl+comma, in the main menu) choose which ones:
+  None, Animated (GIFs and videos, the default) or All; kept on this device.
 - Linux: a click on a thumbnail (or Enter) opens the meme over the whole panel, growing out of
   the thumbnail as the grid fades behind it: pictures at full size, GIFs playing in a loop,
   videos with their controls. The X button (on the side of the window's own close button) or

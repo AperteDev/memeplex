@@ -29,3 +29,38 @@ pub fn set(key: &str, value: &str) {
         glib::g_warning!("memeplex", "Could not save the setting {key}: {e}");
     }
 }
+
+/// Which thumbnails show their format in a corner (Preferences): none, the ones that move, or
+/// all.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TypeLabels {
+    None,
+    Animated,
+    All,
+}
+
+impl TypeLabels {
+    const KEY: &'static str = "type_labels";
+
+    /// As saved on this device, the animated ones by default.
+    pub fn get() -> Self {
+        match get(Self::KEY).as_deref() {
+            Some("none") => Self::None,
+            Some("all") => Self::All,
+            _ => Self::Animated,
+        }
+    }
+
+    /// The name saved, and the one of its toggle in Preferences.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Animated => "animated",
+            Self::All => "all",
+        }
+    }
+
+    pub fn save(name: &str) {
+        set(Self::KEY, name);
+    }
+}

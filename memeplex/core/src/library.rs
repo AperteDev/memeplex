@@ -24,6 +24,12 @@ pub fn kind(path: &str) -> Option<Kind> {
     }
 }
 
+/// Whether a file moves: a video or a GIF. ponytail: by extension; an animated WebP counts as a
+/// still until the decoders tell them apart.
+pub fn animated(path: &str) -> bool {
+    kind(path) == Some(Kind::Video) || path.to_ascii_lowercase().ends_with(".gif")
+}
+
 /// The folder of the tag files at the root of a meme folder (src/tags.rs): visible, as the
 /// Nextcloud client does not sync hidden files by default.
 pub const TAGS_DIR: &str = "Memeplex";
@@ -97,6 +103,16 @@ fn walk(dir: &Path, rel: &str, found: &mut dyn FnMut(&str, bool)) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn animated_are_gifs_and_videos() {
+        for yes in ["a.gif", "B.GIF", "c.mp4", "d.webm", "e.MOV"] {
+            assert!(animated(yes), "{yes}");
+        }
+        for no in ["a.png", "b.jpg", "c.webp", "gif", "d.txt"] {
+            assert!(!animated(no), "{no}");
+        }
+    }
 
     #[test]
     fn walks_visible_folders_and_memes() {

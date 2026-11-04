@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Memeplex\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
-"POT-Creation-Date: 2026-11-04 12:33+0100\n"
+"POT-Creation-Date: 2026-11-04 13:06+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,51 +17,82 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: memeplex/linux/app/src/window.rs:276
+#: memeplex/linux/app/src/window.rs:307
 msgid "Open Meme Folder"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:373
+#: memeplex/linux/app/src/window.rs:404
 msgid "Every meme has a tag"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:375
+#: memeplex/linux/app/src/window.rs:406
 msgid "This folder has no pictures or videos"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:404 memeplex/linux/app/src/window.rs:478
+#: memeplex/linux/app/src/window.rs:435 memeplex/linux/app/src/window.rs:509
 msgid "All Memes"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:405 memeplex/linux/app/src/window.rs:479
+#: memeplex/linux/app/src/window.rs:436 memeplex/linux/app/src/window.rs:510
 msgid "Untagged"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1303
+#: memeplex/linux/app/src/window.rs:1517
 #, rust-format
 msgid "Remove “{tag}”"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1342
+#: memeplex/linux/app/src/window.rs:1556
 msgid "Still reading this meme, try again in a moment"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1392
+#: memeplex/linux/app/src/window.rs:1606
 msgid "Use Folder Names as Tags?"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1394
+#: memeplex/linux/app/src/window.rs:1608
 msgid ""
 "Each meme gets the names of the folders it is in as tags, besides those it "
 "has."
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1398
+#: memeplex/linux/app/src/window.rs:1612
 msgid "Cancel"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1399
+#: memeplex/linux/app/src/window.rs:1613
 msgid "Add Tags"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:8
+msgid "General"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:13
+msgid "Thumbnails"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:16
+msgid "Format Labels"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:17
+msgid "GIF, MP4 and so on, in a corner"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:25
+msgctxt "format labels"
+msgid "None"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:30
+msgctxt "format labels"
+msgid "Animated"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:35
+msgctxt "format labels"
+msgid "All"
 msgstr ""
 
 #: memeplex/linux/app/ui/window.blp:25
@@ -125,10 +156,14 @@ msgid "Use Folder Names as Tags…"
 msgstr ""
 
 #: memeplex/linux/app/ui/window.blp:274
-msgid "About Memeplex"
+msgid "Preferences"
 msgstr ""
 
 #: memeplex/linux/app/ui/window.blp:275
+msgid "About Memeplex"
+msgstr ""
+
+#: memeplex/linux/app/ui/window.blp:276
 msgid "Quit"
 msgstr ""
 

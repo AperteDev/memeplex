@@ -2,7 +2,8 @@
 //! and the memes of the group picked there as a grid of thumbnails.
 
 use crate::i18n::gettext;
-use crate::settings;
+use crate::preferences;
+use crate::settings::{self, TypeLabels};
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 use memeplex_core::index::Index;
@@ -22,6 +23,7 @@ const CSS: &str = "
 .memes > child { padding: 6px; border-radius: 12px; }
 .preview { background-color: var(--window-bg-color); }
 .tag-bar { border-radius: 12px; }
+.type-label { background: alpha(black, 0.6); color: white; border-radius: 6px; padding: 1px 6px; font-size: x-small; font-weight: bold; }
 :drop(active) { box-shadow: none; outline: none; }
 row.tag-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
 ";
@@ -74,6 +76,8 @@ struct Ui {
     /// The grid's cells, to resize when the size changes.
     cells: RefCell<Vec<glib::WeakRef<gtk::ListItem>>>,
     gifs: Gifs,
+    /// Which thumbnails show their format in a corner (Preferences).
+    labels: Cell<TypeLabels>,
     thumbs: Thumbs,
     grid: gtk::GridView,
     preview: Preview,
@@ -173,6 +177,7 @@ pub fn present(app: &adw::Application) {
         size: Cell::new(0),
         cells: RefCell::default(),
         gifs: Gifs::default(),
+        labels: Cell::new(TypeLabels::get()),
         thumbs: Thumbs {
             made: RefCell::default(),
             wanted: Arc::default(),
@@ -239,6 +244,31 @@ pub fn present(app: &adw::Application) {
         }
     });
     ui.window.add_action(&from_folders);
+    let prefs = gio::SimpleAction::new("preferences", None);
+    let weak = Rc::downgrade(&ui);
+    prefs.connect_activate(move |_, _| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        let weak = Rc::downgrade(&ui);
+        preferences::present(&ui.window, move || {
+            let Some(ui) = weak.upgrade() else {
+                return;
+            };
+            ui.labels.set(TypeLabels::get());
+            let cells: Vec<_> = ui
+                .cells
+                .borrow()
+                .iter()
+                .filter_map(|c| c.upgrade())
+                .collect();
+            for item in &cells {
+                show_label(&ui, item);
+            }
+        });
+    });
+    ui.window.add_action(&prefs);
+    app.set_accels_for_action("win.preferences", &["<Control>comma"]);
     // The last tag changes, saved before the app ends (closed or quit).
     let weak = Rc::downgrade(&ui);
     app.connect_shutdown(move |_| {
@@ -806,8 +836,26 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
     let weak = Rc::downgrade(ui);
     factory.connect_setup(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
+        // The picture, and over it a frame of the picture's size, holding the format label in
+        // its corner (`place_label`).
         let image = gtk::Image::new();
-        item.set_child(Some(&image));
+        let frame = gtk::Box::builder()
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::Center)
+            .can_target(false)
+            .build();
+        let label = gtk::Label::builder()
+            .halign(gtk::Align::End)
+            .valign(gtk::Align::End)
+            .css_classes(["type-label"])
+            .build();
+        frame.append(&label);
+        let overlay = gtk::Overlay::new();
+        overlay.set_child(Some(&image));
+        overlay.add_overlay(&frame);
+        item.set_child(Some(&overlay));
+        let (f, l) = (frame.clone(), label.clone());
+        image.connect_paintable_notify(move |image| place_label(image, &f, &l));
         // Dragged as its file: onto a tag in the sidebar, or out into other apps.
         let drag = gtk::DragSource::new();
         drag.set_actions(gdk::DragAction::COPY);
@@ -835,6 +883,7 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
             // Sized before it is bound: the grid counts how many cells fill the view by it,
             // and made one for every meme while they measured nothing.
             image.set_size_request(ui.size.get(), ui.size.get());
+            frame.set_size_request(ui.size.get(), ui.size.get());
             ui.cells.borrow_mut().push(item.downgrade());
         }
     });
@@ -854,14 +903,76 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
     factory
 }
 
+/// The picture of a cell.
+fn image_of(item: &gtk::ListItem) -> Option<gtk::Image> {
+    item.child()?
+        .downcast::<gtk::Overlay>()
+        .ok()?
+        .child()?
+        .downcast()
+        .ok()
+}
+
+/// The frame and the format label of a cell, over its picture.
+fn label_of(item: &gtk::ListItem) -> Option<(gtk::Box, gtk::Label)> {
+    let frame = item
+        .child()?
+        .downcast::<gtk::Overlay>()
+        .ok()?
+        .last_child()?
+        .downcast::<gtk::Box>()
+        .ok()?;
+    let label = frame.first_child()?.downcast().ok()?;
+    Some((frame, label))
+}
+
+/// The format label of a cell as Preferences says: the file's extension, or hidden. Sized to the
+/// thumbnail too, for the corner it sits in.
+fn show_label(ui: &Ui, item: &gtk::ListItem) {
+    let (Some(path), Some(image), Some((frame, label))) =
+        (path_of(item), image_of(item), label_of(item))
+    else {
+        return;
+    };
+    let shown = match ui.labels.get() {
+        TypeLabels::None => false,
+        TypeLabels::Animated => library::animated(&path),
+        TypeLabels::All => true,
+    };
+    label.set_visible(shown);
+    if shown {
+        let ext = Path::new(&path).extension().and_then(|e| e.to_str());
+        label.set_label(&ext.unwrap_or_default().to_uppercase());
+    }
+    frame.set_size_request(ui.size.get(), ui.size.get());
+    place_label(&image, &frame, &label);
+}
+
+/// Put the label in the corner of the picture, which fits in the frame (a square of the
+/// thumbnail size) and sits in the middle of it, not in the corner of the frame.
+fn place_label(image: &gtk::Image, frame: &gtk::Box, label: &gtk::Label) {
+    let side = f64::from(frame.width_request());
+    let ratio = image
+        .paintable()
+        .map(|p| p.intrinsic_aspect_ratio())
+        .filter(|r| *r > 0.0)
+        .unwrap_or(1.0);
+    let (w, h) = if ratio >= 1.0 {
+        (side, side / ratio)
+    } else {
+        (side * ratio, side)
+    };
+    label.set_margin_end(((side - w) / 2.0).round() as i32 + 4);
+    label.set_margin_bottom(((side - h) / 2.0).round() as i32 + 4);
+}
+
 fn path_of(item: &gtk::ListItem) -> Option<String> {
     let path = item.item().and_downcast::<gtk::StringObject>()?.string();
     Some(path.into())
 }
 
 fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
-    let (Some(path), Some(image)) = (path_of(item), item.child().and_downcast::<gtk::Image>())
-    else {
+    let (Some(path), Some(image)) = (path_of(item), image_of(item)) else {
         return;
     };
     image.set_tooltip_text(Some(name(&path)));
@@ -870,6 +981,7 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
     image.set_opacity(1.0);
     let size = ui.size.get();
     image.set_size_request(size, size);
+    show_label(ui, item);
     if library::kind(&path) == Some(Kind::Video) {
         // A frame once `start_media` has taken one, an icon until then.
         let still = ui.thumbs.made.borrow().get(&path).map(|(_, t)| t.clone());
@@ -925,7 +1037,7 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
         // Unless the cell shows another meme by now.
         if let Some(item) = item.upgrade()
             && path_of(&item) == Some(path)
-            && let Some(image) = item.child().and_downcast::<gtk::Image>()
+            && let Some(image) = image_of(&item)
             // Unless the GIF has taken its place.
             && !image.paintable().is_some_and(|p| p.is::<gtk::MediaFile>())
         {
@@ -1078,7 +1190,7 @@ fn thumbnail_insets(ui: &Ui, position: u32) -> Option<([f64; 4], gtk::Image)> {
         .iter()
         .filter_map(|c| c.upgrade())
         .find(|i| i.position() == position && i.item().is_some())?;
-    let image = item.child().and_downcast::<gtk::Image>()?;
+    let image = image_of(&item)?;
     if !image.is_mapped() {
         return None;
     }
@@ -1221,8 +1333,7 @@ fn play_thumbnail(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
 /// Start what the cell of `item` needs if it is on screen: a GIF playing if animation is on; a
 /// video playing if it is, or else for a moment, for a frame as its still.
 fn play_visible(ui: &Rc<Ui>, item: &gtk::ListItem) {
-    let (Some(path), Some(image)) = (path_of(item), item.child().and_downcast::<gtk::Image>())
-    else {
+    let (Some(path), Some(image)) = (path_of(item), image_of(item)) else {
         return;
     };
     if !image.is_mapped() {
@@ -1252,7 +1363,7 @@ fn stop_animation(ui: &Rc<Ui>, item: &gtk::ListItem) {
     ui.gifs.queue.borrow_mut().retain(|(p, _)| *p != path);
     if release(ui, &path) {
         // The cell lets go of it, so that it ends with the timer.
-        if let Some(image) = item.child().and_downcast::<gtk::Image>() {
+        if let Some(image) = image_of(item) {
             let still = ui.thumbs.made.borrow().get(&path).map(|(_, t)| t.clone());
             image.set_paintable(still.as_ref());
         }

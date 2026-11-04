@@ -1,6 +1,7 @@
 //! Memeplex for Linux: the GTK app.
 
 mod i18n;
+mod preferences;
 mod settings;
 mod window;
 

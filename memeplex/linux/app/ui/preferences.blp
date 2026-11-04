@@ -1,0 +1,41 @@
+using Gtk 4.0;
+using Adw 1;
+
+Adw.PreferencesDialog dialog {
+  search-enabled: false;
+
+  Adw.PreferencesPage {
+    title: _("General");
+    icon-name: "preferences-system-symbolic";
+
+    // Kept on this device only.
+    Adw.PreferencesGroup {
+      title: _("Thumbnails");
+
+      Adw.ActionRow {
+        title: _("Format Labels");
+        subtitle: _("GIF, MP4 and so on, in a corner");
+
+        [suffix]
+        Adw.ToggleGroup type_labels {
+          valign: center;
+
+          Adw.Toggle {
+            name: "none";
+            label: C_("format labels", "None");
+          }
+
+          Adw.Toggle {
+            name: "animated";
+            label: C_("format labels", "Animated");
+          }
+
+          Adw.Toggle {
+            name: "all";
+            label: C_("format labels", "All");
+          }
+        }
+      }
+    }
+  }
+}
