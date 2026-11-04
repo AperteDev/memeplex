@@ -89,8 +89,8 @@ Adw.ApplicationWindow window {
           icon-name: "view-grid-symbolic";
           tooltip-text: _("View Options");
 
-          // The builder sets the menu after the children: the rows are added to it in code
-          // (`size_box`, `animate_box`).
+          // The builder sets the menu after the children: the size row is added to it in code
+          // (`size_box`).
           popover: Gtk.PopoverMenu view_popover {
             menu-model: view_menu;
 
@@ -126,24 +126,6 @@ Adw.ApplicationWindow window {
 
               Gtk.Image {
                 icon-name: "zoom-in-symbolic";
-              }
-            }
-
-            // Whether GIFs play in the grid (src/window.rs `connect_animate`).
-            [animate]
-            Gtk.Box animate_box {
-              spacing: 12;
-              margin-start: 6;
-              margin-end: 6;
-
-              Gtk.Label {
-                label: _("Animate Thumbnails");
-                hexpand: true;
-                xalign: 0;
-              }
-
-              Gtk.Switch animate {
-                valign: center;
               }
             }
           };
@@ -275,10 +257,11 @@ menu view_menu {
     item {
       custom: "size";
     }
+  }
 
-    item {
-      custom: "animate";
-    }
+  section {
+    // Whether GIFs play in the grid (src/window.rs `connect_animate`).
+    item (_("Animate Thumbnails"), "win.animate-thumbnails")
   }
 }
 

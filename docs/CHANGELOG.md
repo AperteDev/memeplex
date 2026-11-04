@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   there, with those of its folders, as a grid of thumbnails. The folder opens again at the next
   start. Each folder in the tree shows how many memes it holds, with those of its folders,
   dimmed after its name. View Options, at the right of the grid's header, has a slider for the
-  thumbnails' size and a switch to play GIFs in the grid (off by default), both kept on this
+  thumbnails' size and a check to play GIFs in the grid (off by default), both kept on this
   device. The sidebar hides and shows again with the button at the left of the grid's header
   (F9).
 - Linux: a click on a thumbnail (or Enter) opens the meme over the whole panel, growing out of

@@ -252,9 +252,7 @@ pub fn present(app: &adw::Application) {
     let size_box: gtk::Box = get(&b, "size_box");
     get::<gtk::PopoverMenu>(&b, "view_popover").add_child(&size_box, "size");
     connect_size(&ui, &get(&b, "size"));
-    let animate_box: gtk::Box = get(&b, "animate_box");
-    get::<gtk::PopoverMenu>(&b, "view_popover").add_child(&animate_box, "animate");
-    connect_animate(&ui, &get(&b, "animate"));
+    connect_animate(&ui);
     ui.grid
         .set_model(Some(&gtk::NoSelection::new(Some(ui.memes.clone()))));
     ui.grid.set_factory(Some(&grid_factory(&ui)));
@@ -764,18 +762,28 @@ fn connect_size(ui: &Rc<Ui>, scale: &gtk::Scale) {
     });
 }
 
-/// The animation switch in View Options, as saved on this device (off by default): GIFs in
-/// the cells on screen play or stop as it turns.
-fn connect_animate(ui: &Rc<Ui>, switch: &gtk::Switch) {
-    switch.set_active(settings::get("animate_thumbnails").is_some_and(|v| v == "true"));
-    ui.gifs.on.set(switch.is_active());
+/// "Animate Thumbnails" in View Options, a check as saved on this device (off by default): GIFs
+/// in the cells on screen play or stop as it turns.
+fn connect_animate(ui: &Rc<Ui>) {
+    let on = settings::get("animate_thumbnails").is_some_and(|v| v == "true");
+    ui.gifs.on.set(on);
+    let action = gio::SimpleAction::new_stateful("animate-thumbnails", None, &on.to_variant());
     let weak = Rc::downgrade(ui);
-    switch.connect_active_notify(move |switch| {
-        let Some(ui) = weak.upgrade() else {
+    // Activating flips the state, which is what changes it here.
+    action.connect_activate(|action, _| {
+        let on = action
+            .state()
+            .and_then(|s| s.get::<bool>())
+            .unwrap_or(false);
+        action.change_state(&(!on).to_variant());
+    });
+    action.connect_change_state(move |action, state| {
+        let (Some(ui), Some(on)) = (weak.upgrade(), state.and_then(|s| s.get::<bool>())) else {
             return;
         };
-        ui.gifs.on.set(switch.is_active());
-        settings::set("animate_thumbnails", &switch.is_active().to_string());
+        action.set_state(&on.to_variant());
+        ui.gifs.on.set(on);
+        settings::set("animate_thumbnails", &on.to_string());
         // Rebound: a GIF starts playing, or its still shows again.
         let cells: Vec<_> = ui
             .cells
@@ -788,6 +796,7 @@ fn connect_animate(ui: &Rc<Ui>, switch: &gtk::Switch) {
             bind_cell(&ui, item);
         }
     });
+    ui.window.add_action(&action);
 }
 
 /// The grid's cells: a meme's thumbnail, or an icon for a video.
