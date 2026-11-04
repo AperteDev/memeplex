@@ -257,7 +257,7 @@ Adw.ApplicationWindow window {
             visible: false;
             halign: end;
             width-request: 320;
-            margin-top: 64;
+            margin-top: 54;
             margin-end: 12;
             margin-bottom: 12;
             hscrollbar-policy: never;
@@ -282,11 +282,10 @@ Adw.ApplicationWindow window {
             styles ["osd", "circular"]
           }
 
-          // Below the close button, or in its place at the right if that one is at the left
-          // (`place_close`).
+          // Next to the close button, on the side of the meme (`place_close`).
           [overlay]
           Gtk.ToggleButton preview_details_button {
-            icon-name: "sidebar-show-right-symbolic";
+            icon-name: "dialog-information-symbolic";
             tooltip-text: _("Show Details");
             action-name: "win.toggle-details";
             halign: end;

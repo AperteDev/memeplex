@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Memeplex\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
-"POT-Creation-Date: 2026-11-04 13:49+0100\n"
+"POT-Creation-Date: 2026-11-04 13:58+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -42,7 +42,7 @@ msgid "Hide Details"
 msgstr ""
 
 #: memeplex/linux/app/src/window.rs:1153 memeplex/linux/app/src/window.rs:1161
-#: memeplex/linux/app/ui/window.blp:290
+#: memeplex/linux/app/ui/window.blp:289
 msgid "Show Details"
 msgstr ""
 
@@ -201,23 +201,23 @@ msgstr ""
 msgid "Close Preview (Esc)"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:322
+#: memeplex/linux/app/ui/window.blp:321
 msgid "Animate Thumbnails"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:328
+#: memeplex/linux/app/ui/window.blp:327
 msgid "Use Folder Names as Tags…"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:332
+#: memeplex/linux/app/ui/window.blp:331
 msgid "Preferences"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:333
+#: memeplex/linux/app/ui/window.blp:332
 msgid "About Memeplex"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:334
+#: memeplex/linux/app/ui/window.blp:333
 msgid "Quit"
 msgstr ""
 

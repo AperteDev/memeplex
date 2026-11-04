@@ -36,7 +36,7 @@ const CONTROLS_HEIGHT: i32 = 64;
 const PANEL_ROOM: f64 = 344.0;
 
 /// Room above the meme in the preview, for its tags and the X button.
-const PREVIEW_TOP: f64 = 64.0;
+const PREVIEW_TOP: f64 = 54.0;
 
 /// What the grid shows, picked in the sidebar.
 #[derive(Clone, Debug, PartialEq)]
@@ -1293,12 +1293,12 @@ fn place_close(ui: &Ui) {
     } else {
         gtk::Align::End
     });
-    // The details button at the right: below the X, or in its place.
+    // The details button beside it, on the side of the meme.
     let button = &ui.preview.details_button;
-    button.set_margin_top(if left { 12 } else { 12 + 34 + 8 });
-    ui.preview
-        .panel
-        .set_margin_top(if left { 64 } else { 12 + 34 + 8 + 34 + 8 });
+    let beside = 12 + 34 + 8;
+    button.set_halign(ui.preview.close.halign());
+    button.set_margin_start(if left { beside } else { 12 });
+    button.set_margin_end(if left { 12 } else { beside });
 }
 
 /// Show `path` over the grid, grown out of its thumbnail at `preview.position`: a picture, a
