@@ -36,6 +36,20 @@ Adw.PreferencesDialog dialog {
           }
         }
       }
+
+      // Each in the other corner, for the thumbnails that have it.
+      Adw.SwitchRow info_size {
+        title: _("File Size");
+      }
+
+      Adw.SwitchRow info_dimensions {
+        title: _("Dimensions");
+      }
+
+      Adw.SwitchRow info_length {
+        title: _("Length");
+        subtitle: _("Of GIFs and videos");
+      }
     }
   }
 }

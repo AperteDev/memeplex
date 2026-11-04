@@ -64,3 +64,30 @@ impl TypeLabels {
         set(Self::KEY, name);
     }
 }
+
+/// What thumbnails say about their file in a corner (Preferences), each off by default.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub struct ThumbInfo {
+    pub size: bool,
+    pub dimensions: bool,
+    pub length: bool,
+}
+
+impl ThumbInfo {
+    /// The keys of the three, as the switches in Preferences are named.
+    pub const KEYS: [&'static str; 3] = ["info_size", "info_dimensions", "info_length"];
+
+    /// As saved on this device.
+    pub fn get() -> Self {
+        let on = |key| get(key).is_some_and(|v| v == "true");
+        Self {
+            size: on(Self::KEYS[0]),
+            dimensions: on(Self::KEYS[1]),
+            length: on(Self::KEYS[2]),
+        }
+    }
+
+    pub fn any(self) -> bool {
+        self.size || self.dimensions || self.length
+    }
+}

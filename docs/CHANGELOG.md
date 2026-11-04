@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux: thumbnails show their format (GIF, MP4…) in a corner of the picture, so a still frame of
   a GIF or a video is told apart. Preferences (Ctrl+comma, in the main menu) choose which ones:
   None, Animated (GIFs and videos, the default) or All; kept on this device.
+  Three more switches there add the file size, the dimensions and the length (of GIFs and
+  videos) in the other corner, all off by default.
 - Linux: a click on a thumbnail (or Enter) opens the meme over the whole panel, growing out of
   the thumbnail as the grid fades behind it: pictures at full size, GIFs playing in a loop
   and videos, both with controls (play, pause, progress), and the frame a GIF is at. The X

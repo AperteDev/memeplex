@@ -3,7 +3,7 @@
 
 use crate::i18n::gettext;
 use crate::preferences;
-use crate::settings::{self, TypeLabels};
+use crate::settings::{self, ThumbInfo, TypeLabels};
 use adw::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib};
 use memeplex_core::index::Index;
@@ -82,6 +82,10 @@ struct Ui {
     gifs: Gifs,
     /// Which thumbnails show their format in a corner (Preferences).
     labels: Cell<TypeLabels>,
+    /// What thumbnails say about their file in the corner (Preferences), and what is known of
+    /// the files shown so far, by path.
+    info: Cell<ThumbInfo>,
+    facts: RefCell<HashMap<String, Facts>>,
     /// Whether the preview has its details panel (the button below the X), kept on this device.
     details_on: Cell<bool>,
     thumbs: Thumbs,
@@ -132,6 +136,16 @@ struct Preview {
     gif: RefCell<Option<gtk::MediaFile>>,
     /// The growing or shrinking under way.
     animation: RefCell<Option<adw::TimedAnimation>>,
+}
+
+/// What is known of a file for the thumbnail's corner.
+#[derive(Clone, Default)]
+struct Facts {
+    bytes: u64,
+    dimensions: Option<(i32, i32)>,
+    length_ms: Option<u32>,
+    /// `dimensions` and `length_ms` are final: for a video once its player has told them.
+    ready: bool,
 }
 
 /// GIFs and videos playing in the grid, the first if View Options says so, the second
@@ -195,6 +209,8 @@ pub fn present(app: &adw::Application) {
         cells: RefCell::default(),
         gifs: Gifs::default(),
         labels: Cell::new(TypeLabels::get()),
+        info: Cell::new(ThumbInfo::get()),
+        facts: RefCell::default(),
         details_on: Cell::new(settings::get("details_panel").is_some_and(|v| v == "true")),
         thumbs: Thumbs {
             made: RefCell::default(),
@@ -281,6 +297,7 @@ pub fn present(app: &adw::Application) {
                 return;
             };
             ui.labels.set(TypeLabels::get());
+            ui.info.set(ThumbInfo::get());
             let cells: Vec<_> = ui
                 .cells
                 .borrow()
@@ -289,6 +306,9 @@ pub fn present(app: &adw::Application) {
                 .collect();
             for item in &cells {
                 show_label(&ui, item);
+                show_info(&ui, item);
+                // A video not yet opened for what it says.
+                play_visible(&ui, item);
             }
         });
     });
@@ -869,18 +889,34 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
             .valign(gtk::Align::Center)
             .can_target(false)
             .build();
+        // A row along the foot of the picture: what the file says (size, length) at the start,
+        // cut short if it must be, and the format at the end.
+        let row = gtk::Box::builder()
+            .halign(gtk::Align::Center)
+            .valign(gtk::Align::End)
+            .hexpand(true)
+            .spacing(4)
+            .build();
+        let info = gtk::Label::builder()
+            .halign(gtk::Align::Start)
+            .hexpand(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .css_classes(["type-label"])
+            .visible(false)
+            .build();
         let label = gtk::Label::builder()
             .halign(gtk::Align::End)
-            .valign(gtk::Align::End)
             .css_classes(["type-label"])
             .build();
-        frame.append(&label);
+        row.append(&info);
+        row.append(&label);
+        frame.append(&row);
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&image));
         overlay.add_overlay(&frame);
         item.set_child(Some(&overlay));
-        let (f, l) = (frame.clone(), label.clone());
-        image.connect_paintable_notify(move |image| place_label(image, &f, &l));
+        let (f, r) = (frame.clone(), row.clone());
+        image.connect_paintable_notify(move |image| place_label(image, &f, &r));
         // Dragged as its file: onto a tag in the sidebar, or out into other apps.
         let drag = gtk::DragSource::new();
         drag.set_actions(gdk::DragAction::COPY);
@@ -896,6 +932,7 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
         image.connect_map(move |_| {
             if let (Some(ui), Some(item)) = (w.upgrade(), cell.upgrade()) {
                 play_visible(&ui, &item);
+                show_info(&ui, &item);
             }
         });
         let (w, cell) = (weak.clone(), item.downgrade());
@@ -938,8 +975,8 @@ fn image_of(item: &gtk::ListItem) -> Option<gtk::Image> {
         .ok()
 }
 
-/// The frame and the format label of a cell, over its picture.
-fn label_of(item: &gtk::ListItem) -> Option<(gtk::Box, gtk::Label)> {
+/// The frame over the picture of a cell, the row of labels in it, and the format and info labels.
+fn label_of(item: &gtk::ListItem) -> Option<(gtk::Box, gtk::Box, gtk::Label, gtk::Label)> {
     let frame = item
         .child()?
         .downcast::<gtk::Overlay>()
@@ -947,14 +984,16 @@ fn label_of(item: &gtk::ListItem) -> Option<(gtk::Box, gtk::Label)> {
         .last_child()?
         .downcast::<gtk::Box>()
         .ok()?;
-    let label = frame.first_child()?.downcast().ok()?;
-    Some((frame, label))
+    let row = frame.first_child()?.downcast::<gtk::Box>().ok()?;
+    let info = row.first_child()?.downcast().ok()?;
+    let label = row.last_child()?.downcast().ok()?;
+    Some((frame, row, label, info))
 }
 
 /// The format label of a cell as Preferences says: the file's extension, or hidden. Sized to the
 /// thumbnail too, for the corner it sits in.
 fn show_label(ui: &Ui, item: &gtk::ListItem) {
-    let (Some(path), Some(image), Some((frame, label))) =
+    let (Some(path), Some(image), Some((frame, row, label, _))) =
         (path_of(item), image_of(item), label_of(item))
     else {
         return;
@@ -970,12 +1009,12 @@ fn show_label(ui: &Ui, item: &gtk::ListItem) {
         label.set_label(&ext.unwrap_or_default().to_uppercase());
     }
     frame.set_size_request(ui.size.get(), ui.size.get());
-    place_label(&image, &frame, &label);
+    place_label(&image, &frame, &row);
 }
 
-/// Put the label in the corner of the picture, which fits in the frame (a square of the
-/// thumbnail size) and sits in the middle of it, not in the corner of the frame.
-fn place_label(image: &gtk::Image, frame: &gtk::Box, label: &gtk::Label) {
+/// Put the row of labels along the foot of the picture, which fits in the frame (a square of the
+/// thumbnail size) and sits in the middle of it, not along the foot of the frame.
+fn place_label(image: &gtk::Image, frame: &gtk::Box, row: &gtk::Box) {
     let side = f64::from(frame.width_request());
     let ratio = image
         .paintable()
@@ -987,8 +1026,109 @@ fn place_label(image: &gtk::Image, frame: &gtk::Box, label: &gtk::Label) {
     } else {
         (side * ratio, side)
     };
-    label.set_margin_end(((side - w) / 2.0).round() as i32 + 4);
-    label.set_margin_bottom(((side - h) / 2.0).round() as i32 + 4);
+    row.set_width_request((w - 8.0).max(0.0).round() as i32);
+    row.set_margin_bottom(((side - h) / 2.0).round() as i32 + 4);
+}
+
+/// What is known of the file at `path`, found out the first time: its size, and for a picture
+/// its dimensions and a GIF's length; a video's wait for its player (`note_video`).
+fn facts_of(ui: &Ui, path: &str) -> Facts {
+    if let Some(facts) = ui.facts.borrow().get(path) {
+        return facts.clone();
+    }
+    let facts = base_facts(path);
+    ui.facts
+        .borrow_mut()
+        .insert(path.to_string(), facts.clone());
+    facts
+}
+
+fn base_facts(path: &str) -> Facts {
+    let mut facts = Facts {
+        bytes: std::fs::metadata(path).map_or(0, |m| m.len()),
+        ..Facts::default()
+    };
+    if library::kind(path) != Some(Kind::Video) {
+        facts.dimensions = gdk_pixbuf::Pixbuf::file_info(path).map(|(_, w, h)| (w, h));
+        if path.to_ascii_lowercase().ends_with(".gif") {
+            facts.length_ms = memeplex_core::gif::frame_delays(path).map(|d| d.iter().sum());
+        }
+        facts.ready = true;
+    }
+    facts
+}
+
+/// The size, dimensions and length wanted, as the corner's text.
+fn facts_text(opts: ThumbInfo, facts: &Facts) -> String {
+    let mut parts = Vec::new();
+    if opts.size {
+        parts.push(glib::format_size(facts.bytes).to_string());
+    }
+    if opts.dimensions
+        && let Some((w, h)) = facts.dimensions
+    {
+        parts.push(format!("{w}×{h}"));
+    }
+    if opts.length
+        && let Some(ms) = facts.length_ms
+    {
+        parts.push(if ms < 60_000 {
+            format!("{:.1} s", f64::from(ms) / 1000.0)
+        } else {
+            format!("{}:{:02}", ms / 60_000, ms / 1000 % 60)
+        });
+    }
+    parts.join(" · ")
+}
+
+/// The info label of a cell as Preferences says, for a cell on screen: hidden otherwise, and
+/// filled once the cell is mapped.
+fn show_info(ui: &Ui, item: &gtk::ListItem) {
+    let (Some(path), Some(image), Some((_, _, _, label))) =
+        (path_of(item), image_of(item), label_of(item))
+    else {
+        return;
+    };
+    let opts = ui.info.get();
+    if !opts.any() || !image.is_mapped() {
+        label.set_visible(false);
+        return;
+    }
+    let text = facts_text(opts, &facts_of(ui, &path));
+    label.set_visible(!text.is_empty());
+    label.set_label(&text);
+}
+
+/// Whether the video at `path` is to be opened for the dimensions or length wanted.
+fn needs_facts(ui: &Ui, path: &str) -> bool {
+    let opts = ui.info.get();
+    (opts.dimensions || opts.length) && !facts_of(ui, path).ready
+}
+
+/// A video's dimensions and length, from its player once it knows them; the cell says so.
+fn note_video(ui: &Ui, path: &str, media: &gtk::MediaFile) {
+    let (w, h, duration) = (
+        media.intrinsic_width(),
+        media.intrinsic_height(),
+        media.duration(),
+    );
+    if !media.is_prepared() || w <= 0 || h <= 0 || duration <= 0 || facts_of(ui, path).ready {
+        return;
+    }
+    if let Some(facts) = ui.facts.borrow_mut().get_mut(path) {
+        facts.dimensions = Some((w, h));
+        facts.length_ms = u32::try_from(duration / 1000).ok();
+        facts.ready = true;
+    }
+    let cells: Vec<_> = ui
+        .cells
+        .borrow()
+        .iter()
+        .filter_map(|c| c.upgrade())
+        .collect();
+    if let Some(item) = cells.iter().find(|c| path_of(c).as_deref() == Some(path)) {
+        show_info(ui, item);
+    }
 }
 
 fn path_of(item: &gtk::ListItem) -> Option<String> {
@@ -1007,6 +1147,7 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
     let size = ui.size.get();
     image.set_size_request(size, size);
     show_label(ui, item);
+    show_info(ui, item);
     if library::kind(&path) == Some(Kind::Video) {
         // A frame once `start_media` has taken one, an icon until then.
         let still = ui.thumbs.made.borrow().get(&path).map(|(_, t)| t.clone());
@@ -1597,7 +1738,9 @@ fn play_visible(ui: &Rc<Ui>, item: &gtk::ListItem) {
         return;
     }
     let wanted = match library::kind(&path) {
-        Some(Kind::Video) => ui.gifs.on.get() || still_side(ui, &path).is_some(),
+        Some(Kind::Video) => {
+            ui.gifs.on.get() || still_side(ui, &path).is_some() || needs_facts(ui, &path)
+        }
         _ => ui.gifs.on.get() && path.to_ascii_lowercase().ends_with(".gif"),
     };
     if wanted {
@@ -1702,18 +1845,21 @@ fn start_media(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
         if ui.gifs.playing.borrow().get(&file) != Some(media) {
             return;
         }
-        // The first frames come before the size is known: tried again until then.
-        if video
-            && let Some(side) = still_side(&ui, &file)
-            && let Some(texture) = frame_of(&ui, media, side)
-        {
-            ui.thumbs
-                .made
-                .borrow_mut()
-                .insert(file.clone(), (side, texture.clone()));
-            image.set_pixel_size(ui.size.get());
-            image.set_paintable(Some(&texture));
-            if !ui.gifs.on.get() {
+        if video {
+            note_video(&ui, &file, media);
+            // The first frames come before the size is known: tried again until then.
+            if let Some(side) = still_side(&ui, &file)
+                && let Some(texture) = frame_of(&ui, media, side)
+            {
+                ui.thumbs
+                    .made
+                    .borrow_mut()
+                    .insert(file.clone(), (side, texture.clone()));
+                image.set_pixel_size(ui.size.get());
+                image.set_paintable(Some(&texture));
+            }
+            // Let go once it has what it was opened for.
+            if !ui.gifs.on.get() && still_side(&ui, &file).is_none() && !needs_facts(&ui, &file) {
                 release(&ui, &file);
                 return;
             }

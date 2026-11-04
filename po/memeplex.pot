@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Memeplex\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
-"POT-Creation-Date: 2026-11-04 13:58+0100\n"
+"POT-Creation-Date: 2026-11-04 14:08+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,104 +17,105 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: memeplex/linux/app/src/window.rs:335
+#: memeplex/linux/app/src/window.rs:352
 msgid "Open Meme Folder"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:432
+#: memeplex/linux/app/src/window.rs:449
 msgid "Every meme has a tag"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:434
+#: memeplex/linux/app/src/window.rs:451
 msgid "This folder has no pictures or videos"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:463 memeplex/linux/app/src/window.rs:537
+#: memeplex/linux/app/src/window.rs:480 memeplex/linux/app/src/window.rs:554
 msgid "All Memes"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:464 memeplex/linux/app/src/window.rs:538
+#: memeplex/linux/app/src/window.rs:481 memeplex/linux/app/src/window.rs:555
 msgid "Untagged"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1151 memeplex/linux/app/src/window.rs:1159
+#: memeplex/linux/app/src/window.rs:1289 memeplex/linux/app/src/window.rs:1297
 msgid "Hide Details"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1153 memeplex/linux/app/src/window.rs:1161
+#: memeplex/linux/app/src/window.rs:1291 memeplex/linux/app/src/window.rs:1299
 #: memeplex/linux/app/ui/window.blp:289
 msgid "Show Details"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1211
+#: memeplex/linux/app/src/window.rs:1349
 msgid "Name"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1218
+#: memeplex/linux/app/src/window.rs:1356
 msgid "Folder"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1222
+#: memeplex/linux/app/src/window.rs:1360
 msgid "Type"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1227
+#: memeplex/linux/app/src/window.rs:1365
 msgid "Size"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1233 memeplex/linux/app/src/window.rs:1252
+#: memeplex/linux/app/src/window.rs:1371 memeplex/linux/app/src/window.rs:1390
+#: memeplex/linux/app/ui/preferences.blp:46
 msgid "Dimensions"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1237
+#: memeplex/linux/app/src/window.rs:1375
 msgid "Frames"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1240 memeplex/linux/app/src/window.rs:1257
+#: memeplex/linux/app/src/window.rs:1378 memeplex/linux/app/src/window.rs:1395
 msgid "Duration"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1268
+#: memeplex/linux/app/src/window.rs:1406
 msgid "Modified"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1272 memeplex/linux/app/ui/window.blp:42
+#: memeplex/linux/app/src/window.rs:1410 memeplex/linux/app/ui/window.blp:42
 msgid "Tags"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1274
+#: memeplex/linux/app/src/window.rs:1412
 msgid "None"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1561
+#: memeplex/linux/app/src/window.rs:1699
 #, rust-format
 msgid "Frame {current} / {total}"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1777
+#: memeplex/linux/app/src/window.rs:1920
 #, rust-format
 msgid "Remove “{tag}”"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1817
+#: memeplex/linux/app/src/window.rs:1960
 msgid "Still reading this meme, try again in a moment"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1867
+#: memeplex/linux/app/src/window.rs:2010
 msgid "Use Folder Names as Tags?"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1869
+#: memeplex/linux/app/src/window.rs:2012
 msgid ""
 "Each meme gets the names of the folders it is in as tags, besides those it "
 "has."
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1873
+#: memeplex/linux/app/src/window.rs:2016
 msgid "Cancel"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1874
+#: memeplex/linux/app/src/window.rs:2017
 msgid "Add Tags"
 msgstr ""
 
@@ -147,6 +148,18 @@ msgstr ""
 #: memeplex/linux/app/ui/preferences.blp:35
 msgctxt "format labels"
 msgid "All"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:42
+msgid "File Size"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:50
+msgid "Length"
+msgstr ""
+
+#: memeplex/linux/app/ui/preferences.blp:51
+msgid "Of GIFs and videos"
 msgstr ""
 
 #: memeplex/linux/app/ui/window.blp:25
