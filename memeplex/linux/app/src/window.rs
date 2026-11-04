@@ -114,7 +114,7 @@ struct Preview {
 }
 
 /// GIFs playing in the grid, if View Options says so. GStreamer crashed (in its own thread) when
-/// many were made or torn down at once, so one is started or let go every tick of a timer.
+/// many were made or torn down at once, so one is started or let go every tick of a timer (10 ms).
 #[derive(Default)]
 struct Gifs {
     on: Cell<bool>,
@@ -817,6 +817,19 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
             Some(gdk::ContentProvider::for_value(&files.to_value()))
         });
         image.add_controller(drag);
+        // Only the GIFs on screen play: the grid binds every meme, shown or not.
+        let (w, cell) = (weak.clone(), item.downgrade());
+        image.connect_map(move |_| {
+            if let (Some(ui), Some(item)) = (w.upgrade(), cell.upgrade()) {
+                play_visible(&ui, &item);
+            }
+        });
+        let (w, cell) = (weak.clone(), item.downgrade());
+        image.connect_unmap(move |_| {
+            if let (Some(ui), Some(item)) = (w.upgrade(), cell.upgrade()) {
+                stop_animation(&ui, &item);
+            }
+        });
         if let Some(ui) = weak.upgrade() {
             // Sized before it is bound: the grid counts how many cells fill the view by it,
             // and made one for every meme while they measured nothing.
@@ -863,9 +876,7 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
         return;
     }
     image.set_pixel_size(size);
-    if ui.gifs.on.get() && path.to_ascii_lowercase().ends_with(".gif") {
-        play_thumbnail(ui, &path, &image);
-    }
+    play_visible(ui, item);
     let size = size * ui.window.scale_factor();
     match ui.thumbs.made.borrow().get(&path) {
         // Made at least this large; a smaller one shows until a sharper one is made.
@@ -1196,7 +1207,20 @@ fn play_thumbnail(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
     tick(ui);
 }
 
-/// Stop the GIF playing in the cell of `item`, if one does.
+/// Play the GIF in the cell of `item`, if animation is on and the cell is on screen.
+fn play_visible(ui: &Rc<Ui>, item: &gtk::ListItem) {
+    if let (true, Some(path), Some(image)) = (
+        ui.gifs.on.get(),
+        path_of(item),
+        item.child().and_downcast::<gtk::Image>(),
+    ) && image.is_mapped()
+        && path.to_ascii_lowercase().ends_with(".gif")
+    {
+        play_thumbnail(ui, &path, &image);
+    }
+}
+
+/// Stop the GIF playing in the cell of `item`, if one does; its still shows again.
 fn stop_animation(ui: &Rc<Ui>, item: &gtk::ListItem) {
     let Some(path) = path_of(item) else {
         return;
@@ -1207,7 +1231,8 @@ fn stop_animation(ui: &Rc<Ui>, item: &gtk::ListItem) {
         media.pause();
         // The cell lets go of it, so that it ends with the timer.
         if let Some(image) = item.child().and_downcast::<gtk::Image>() {
-            image.set_paintable(None::<&gdk::Paintable>);
+            let still = ui.thumbs.made.borrow().get(&path).map(|(_, t)| t.clone());
+            image.set_paintable(still.as_ref());
         }
         g.dead.borrow_mut().push(media);
         tick(ui);
@@ -1220,7 +1245,7 @@ fn tick(ui: &Rc<Ui>) {
         return;
     }
     let weak = Rc::downgrade(ui);
-    glib::timeout_add_local(std::time::Duration::from_millis(30), move || {
+    glib::timeout_add_local(std::time::Duration::from_millis(10), move || {
         let Some(ui) = weak.upgrade() else {
             return glib::ControlFlow::Break;
         };
