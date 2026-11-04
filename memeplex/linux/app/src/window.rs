@@ -8,7 +8,7 @@ use gtk::{gdk, gdk_pixbuf, gio, glib};
 use memeplex_core::index::Index;
 use memeplex_core::library::{self, Kind};
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -73,9 +73,7 @@ struct Ui {
     size: Cell<i32>,
     /// The grid's cells, to resize when the size changes.
     cells: RefCell<Vec<glib::WeakRef<gtk::ListItem>>>,
-    /// Whether GIFs play in the grid (View Options), and those playing, by path.
-    animate: Cell<bool>,
-    playing: RefCell<HashMap<String, gtk::MediaFile>>,
+    gifs: Gifs,
     thumbs: Thumbs,
     grid: gtk::GridView,
     preview: Preview,
@@ -113,6 +111,20 @@ struct Preview {
     gif: RefCell<Option<gtk::MediaFile>>,
     /// The growing or shrinking under way.
     animation: RefCell<Option<adw::TimedAnimation>>,
+}
+
+/// GIFs playing in the grid, if View Options says so. GStreamer crashed (in its own thread) when
+/// many were made or torn down at once, so one is started or let go every tick of a timer.
+#[derive(Default)]
+struct Gifs {
+    on: Cell<bool>,
+    /// Playing, by path.
+    playing: RefCell<HashMap<String, gtk::MediaFile>>,
+    /// Waiting to start, with the image they play in.
+    queue: RefCell<VecDeque<(String, glib::WeakRef<gtk::Image>)>>,
+    /// Stopped, waiting to be let go.
+    dead: RefCell<Vec<gtk::MediaFile>>,
+    ticking: Cell<bool>,
 }
 
 /// Thumbnails, made on a few threads for the cells on screen.
@@ -159,8 +171,7 @@ pub fn present(app: &adw::Application) {
         shown: RefCell::new(Group::All),
         size: Cell::new(0),
         cells: RefCell::default(),
-        animate: Cell::new(false),
-        playing: RefCell::default(),
+        gifs: Gifs::default(),
         thumbs: Thumbs {
             made: RefCell::default(),
             wanted: Arc::default(),
@@ -757,13 +768,13 @@ fn connect_size(ui: &Rc<Ui>, scale: &gtk::Scale) {
 /// the cells on screen play or stop as it turns.
 fn connect_animate(ui: &Rc<Ui>, switch: &gtk::Switch) {
     switch.set_active(settings::get("animate_thumbnails").is_some_and(|v| v == "true"));
-    ui.animate.set(switch.is_active());
+    ui.gifs.on.set(switch.is_active());
     let weak = Rc::downgrade(ui);
     switch.connect_active_notify(move |switch| {
         let Some(ui) = weak.upgrade() else {
             return;
         };
-        ui.animate.set(switch.is_active());
+        ui.gifs.on.set(switch.is_active());
         settings::set("animate_thumbnails", &switch.is_active().to_string());
         // Rebound: a GIF starts playing, or its still shows again.
         let cells: Vec<_> = ui
@@ -843,7 +854,7 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
         return;
     }
     image.set_pixel_size(size);
-    if ui.animate.get() && path.to_ascii_lowercase().ends_with(".gif") {
+    if ui.gifs.on.get() && path.to_ascii_lowercase().ends_with(".gif") {
         play_thumbnail(ui, &path, &image);
     }
     let size = size * ui.window.scale_factor();
@@ -1163,14 +1174,70 @@ fn loop_media(media: &gtk::MediaFile) {
     });
 }
 
-/// A GIF playing in its cell, in place of its still, which shows until the first frame is
+/// A GIF to play in its cell, in place of its still, which shows until the first frame is
 /// decoded.
 fn play_thumbnail(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
+    let g = &ui.gifs;
+    if g.playing.borrow().contains_key(path) || g.queue.borrow().iter().any(|(p, _)| p == path) {
+        return;
+    }
+    g.queue
+        .borrow_mut()
+        .push_back((path.to_string(), image.downgrade()));
+    tick(ui);
+}
+
+/// Stop the GIF playing in the cell of `item`, if one does.
+fn stop_animation(ui: &Rc<Ui>, item: &gtk::ListItem) {
+    let Some(path) = path_of(item) else {
+        return;
+    };
+    let g = &ui.gifs;
+    g.queue.borrow_mut().retain(|(p, _)| *p != path);
+    if let Some(media) = g.playing.borrow_mut().remove(&path) {
+        media.pause();
+        // The cell lets go of it, so that it ends with the timer.
+        if let Some(image) = item.child().and_downcast::<gtk::Image>() {
+            image.set_paintable(None::<&gdk::Paintable>);
+        }
+        g.dead.borrow_mut().push(media);
+        tick(ui);
+    }
+}
+
+/// The timer: let one stopped GIF go, or else start the next one waiting.
+fn tick(ui: &Rc<Ui>) {
+    if ui.gifs.ticking.replace(true) {
+        return;
+    }
+    let weak = Rc::downgrade(ui);
+    glib::timeout_add_local(std::time::Duration::from_millis(30), move || {
+        let Some(ui) = weak.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        let g = &ui.gifs;
+        let dead = g.dead.borrow_mut().pop();
+        if dead.is_some() {
+            return glib::ControlFlow::Continue;
+        }
+        let next = g.queue.borrow_mut().pop_front();
+        let Some((path, image)) = next else {
+            g.ticking.set(false);
+            return glib::ControlFlow::Break;
+        };
+        if let Some(image) = image.upgrade() {
+            start_gif(&ui, &path, &image);
+        }
+        glib::ControlFlow::Continue
+    });
+}
+
+fn start_gif(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
     let media = gtk::MediaFile::for_filename(path);
     let (weak, image, gif) = (Rc::downgrade(ui), image.downgrade(), path.to_string());
     media.connect_invalidate_contents(move |media| {
         if let (Some(ui), Some(image)) = (weak.upgrade(), image.upgrade())
-            && ui.playing.borrow().get(&gif) == Some(media)
+            && ui.gifs.playing.borrow().get(&gif) == Some(media)
             && image.paintable().as_ref() != Some(media.upcast_ref())
         {
             image.set_paintable(Some(media));
@@ -1178,16 +1245,7 @@ fn play_thumbnail(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
     });
     loop_media(&media);
     media.play();
-    if let Some(old) = ui.playing.borrow_mut().insert(path.to_string(), media) {
-        old.pause();
-    }
-}
-
-/// Stop the GIF playing in the cell of `item`, if one does.
-fn stop_animation(ui: &Ui, item: &gtk::ListItem) {
-    if let Some(media) = path_of(item).and_then(|p| ui.playing.borrow_mut().remove(&p)) {
-        media.pause();
-    }
+    ui.gifs.playing.borrow_mut().insert(path.to_string(), media);
 }
 
 /// A picture at full size: its thumbnail at once, the full one once loaded.
