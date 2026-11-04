@@ -214,6 +214,18 @@ Adw.ApplicationWindow window {
             styles ["osd", "tag-bar"]
           }
 
+          // The frame of a GIF shown, above its controls (src/window.rs `play_gif`).
+          [overlay]
+          Gtk.Label preview_frame {
+            visible: false;
+            halign: end;
+            valign: end;
+            margin-end: 12;
+            margin-bottom: 64;
+            tooltip-text: _("Frame");
+            styles ["osd", "frame-label", "numeric"]
+          }
+
           // The meme's tags, each removed by a click, and one more typed in (src/window.rs
           // `show_tags`), at the bottom of the meme.
           [overlay]

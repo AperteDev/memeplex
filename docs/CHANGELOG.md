@@ -22,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   None, Animated (GIFs and videos, the default) or All; kept on this device.
 - Linux: a click on a thumbnail (or Enter) opens the meme over the whole panel, growing out of
   the thumbnail as the grid fades behind it: pictures at full size, GIFs playing in a loop
-  and videos, both with controls (play, pause, progress). The X button (on the side of the
-  window's own close button) or Esc shrinks it back into its thumbnail.
+  and videos, both with controls (play, pause, progress), and the frame a GIF is at. The X
+  button (on the side of the window's own close button) or Esc shrinks it back into its thumbnail.
 - Tags: the main way to group memes, any number per meme, kept with the meme's content so they
   stay through renames and moves. The sidebar shows All Memes, Untagged (the memes still to
   sort) and the tags, each with its count; the folder tree moved to its second view, Folders.

@@ -23,6 +23,7 @@ const CSS: &str = "
 .memes > child { padding: 6px; border-radius: 12px; }
 .preview { background-color: var(--window-bg-color); }
 .tag-bar { border-radius: 12px; }
+.frame-label { border-radius: 12px; padding: 6px 12px; }
 .type-label { background: alpha(black, 0.6); color: white; border-radius: 6px; padding: 1px 6px; font-size: x-small; font-weight: bold; }
 :drop(active) { box-shadow: none; outline: none; }
 row.tag-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
@@ -101,6 +102,8 @@ struct Preview {
     bar: gtk::Box,
     /// Play, pause and the progress of a GIF, as a video has.
     controls: gtk::MediaControls,
+    /// Which frame of the GIF shows, of how many.
+    frame: gtk::Label,
     tags: gtk::Box,
     tag_entry: gtk::Entry,
     /// `win.close-preview`, enabled while it is open: Esc goes elsewhere otherwise.
@@ -198,6 +201,7 @@ pub fn present(app: &adw::Application) {
             close: get(&b, "preview_close"),
             bar: get(&b, "preview_bar"),
             controls: get(&b, "preview_controls"),
+            frame: get(&b, "preview_frame"),
             tags: get(&b, "preview_tags"),
             tag_entry: get(&b, "preview_tag_entry"),
             close_action: gio::SimpleAction::new("close-preview", None),
@@ -1238,6 +1242,7 @@ fn set_progress(ui: &Ui, v: f64) {
     p.close.set_opacity(v);
     p.bar.set_opacity(v);
     p.controls.set_opacity(v);
+    p.frame.set_opacity(v);
     let to = p.inset.get();
     let (from, opacity) = match p.from.get() {
         Some(from) => (from, 1.0),
@@ -1317,6 +1322,7 @@ fn play_gif(ui: &Rc<Ui>, path: &str) {
     media.play();
     ui.preview.controls.set_media_stream(Some(&media));
     ui.preview.controls.set_visible(true);
+    show_frames(&ui.preview.frame, &media, path);
     *ui.preview.gif.borrow_mut() = Some(media);
 }
 
@@ -1325,6 +1331,43 @@ fn stop_gif(p: &Preview) {
     p.gif.take();
     p.controls.set_media_stream(None::<&gtk::MediaStream>);
     p.controls.set_visible(false);
+    p.frame.set_visible(false);
+}
+
+/// Keep `label` at the frame `media` is at, from the delays the GIF at `path` gives (not shown
+/// without them). ponytail: the frame whose time the position falls in; GStreamer may round
+/// delays its own way, so it can be a frame off around the changes.
+fn show_frames(label: &gtk::Label, media: &gtk::MediaFile, path: &str) {
+    let Some(delays) = memeplex_core::gif::frame_delays(path) else {
+        return;
+    };
+    let mut end = 0i64;
+    // Microseconds each frame ends at.
+    let ends: Vec<i64> = delays
+        .iter()
+        .map(|d| {
+            end += i64::from(*d) * 1000;
+            end
+        })
+        .collect();
+    let total = ends.len();
+    if total == 0 {
+        return;
+    }
+    label.set_visible(true);
+    let label = label.clone();
+    let update = move |media: &gtk::MediaFile| {
+        let at = ends
+            .partition_point(|e| *e <= media.timestamp())
+            .min(total - 1);
+        label.set_label(
+            &gettext("Frame {current} / {total}")
+                .replace("{current}", &(at + 1).to_string())
+                .replace("{total}", &total.to_string()),
+        );
+    };
+    update(media);
+    media.connect_timestamp_notify(update);
 }
 
 /// Looped by hand: with `loop` set, GTK (4.24) stops a GIF on its last frame at the end.

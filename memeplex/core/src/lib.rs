@@ -1,5 +1,6 @@
 //! Memeplex's core, shared by every front-end.
 
+pub mod gif;
 pub mod index;
 pub mod library;
 pub mod tags;
