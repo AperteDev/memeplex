@@ -28,6 +28,9 @@ const CSS: &str = "
 row.tag-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset: -2px; background: alpha(@accent_bg_color, 0.2); }
 ";
 
+/// Room under the tags in the preview for the controls of a GIF or a video.
+const CONTROLS_HEIGHT: i32 = 64;
+
 /// Room above the meme in the preview, for its tags and the X button.
 const PREVIEW_TOP: f64 = 64.0;
 
@@ -96,6 +99,8 @@ struct Preview {
     close: gtk::Button,
     /// The meme's tags above it: one button each, and an entry for another.
     bar: gtk::Box,
+    /// Play, pause and the progress of a GIF, as a video has.
+    controls: gtk::MediaControls,
     tags: gtk::Box,
     tag_entry: gtk::Entry,
     /// `win.close-preview`, enabled while it is open: Esc goes elsewhere otherwise.
@@ -192,6 +197,7 @@ pub fn present(app: &adw::Application) {
             video: get(&b, "preview_video"),
             close: get(&b, "preview_close"),
             bar: get(&b, "preview_bar"),
+            controls: get(&b, "preview_controls"),
             tags: get(&b, "preview_tags"),
             tag_entry: get(&b, "preview_tag_entry"),
             close_action: gio::SimpleAction::new("close-preview", None),
@@ -1120,7 +1126,7 @@ fn place_close(ui: &Ui) {
 fn open_preview(ui: &Rc<Ui>, path: String) {
     let p = &ui.preview;
     *p.path.borrow_mut() = Some(path.clone());
-    p.gif.take();
+    stop_gif(p);
     ui.title.set_title(name(&path));
     let video = library::kind(&path) == Some(Kind::Video);
     if video {
@@ -1139,6 +1145,10 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
     // the panel, controls at its foot.
     let side = if video { 0.0 } else { 12.0 };
     p.inset.set([side, PREVIEW_TOP, side, side]);
+    // The tags above the controls of a GIF or a video, at the foot of the panel.
+    let controls = video || p.controls.get_visible();
+    p.bar
+        .set_margin_bottom(if controls { CONTROLS_HEIGHT } else { 12 });
     p.tag_entry.set_text("");
     show_tags(ui);
     find_thumbnail(ui, true);
@@ -1227,6 +1237,7 @@ fn set_progress(ui: &Ui, v: f64) {
     p.backdrop.set_opacity(v);
     p.close.set_opacity(v);
     p.bar.set_opacity(v);
+    p.controls.set_opacity(v);
     let to = p.inset.get();
     let (from, opacity) = match p.from.get() {
         Some(from) => (from, 1.0),
@@ -1266,7 +1277,7 @@ fn animate_preview(ui: &Rc<Ui>, open: bool) {
                 p.root.set_visible(false);
                 p.picture.set_paintable(None::<&gdk::Paintable>);
                 p.video.set_media_stream(None::<&gtk::MediaStream>);
-                p.gif.take();
+                stop_gif(p);
                 if let Some(thumbnail) = p.source.take() {
                     thumbnail.set_opacity(1.0);
                 }
@@ -1304,7 +1315,16 @@ fn play_gif(ui: &Rc<Ui>, path: &str) {
         }
     });
     media.play();
+    ui.preview.controls.set_media_stream(Some(&media));
+    ui.preview.controls.set_visible(true);
     *ui.preview.gif.borrow_mut() = Some(media);
+}
+
+/// Let go of the GIF shown, and its controls.
+fn stop_gif(p: &Preview) {
+    p.gif.take();
+    p.controls.set_media_stream(None::<&gtk::MediaStream>);
+    p.controls.set_visible(false);
 }
 
 /// Looped by hand: with `loop` set, GTK (4.24) stops a GIF on its last frame at the end.
