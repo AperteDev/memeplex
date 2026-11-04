@@ -899,13 +899,14 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
             .build();
         let info = gtk::Label::builder()
             .halign(gtk::Align::Start)
-            .hexpand(true)
             .ellipsize(gtk::pango::EllipsizeMode::End)
             .css_classes(["type-label"])
             .visible(false)
             .build();
+        // Takes the room left, so that it stays at the end with the info label hidden too.
         let label = gtk::Label::builder()
             .halign(gtk::Align::End)
+            .hexpand(true)
             .css_classes(["type-label"])
             .build();
         row.append(&info);
