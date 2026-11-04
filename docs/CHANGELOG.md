@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the thumbnail as the grid fades behind it: pictures at full size, GIFs playing in a loop
   and videos, both with controls (play, pause, progress), and the frame a GIF is at. The X
   button (on the side of the window's own close button) or Esc shrinks it back into its thumbnail.
+- Linux: a details panel at the right of the preview, with the file's name, folder, type, size,
+  dimensions, length or frames, date and tags. The button below the X (in its place, if the X
+  is at the left; Alt+Enter) shows it for every meme until it is hidden again; the meme and its
+  bars make room for it, also as it grows out of its thumbnail.
 - Tags: the main way to group memes, any number per meme, kept with the meme's content so they
   stay through renames and moves. The sidebar shows All Memes, Untagged (the memes still to
   sort) and the tags, each with its count; the folder tree moved to its second view, Folders.

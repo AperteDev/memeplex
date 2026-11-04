@@ -32,6 +32,9 @@ row.tag-drop:drop(active) { outline: 2px solid @accent_bg_color; outline-offset:
 /// Room under the tags in the preview for the controls of a GIF or a video.
 const CONTROLS_HEIGHT: i32 = 64;
 
+/// Room the details panel takes at the right of the preview: its width, its margin and a gap.
+const PANEL_ROOM: f64 = 344.0;
+
 /// Room above the meme in the preview, for its tags and the X button.
 const PREVIEW_TOP: f64 = 64.0;
 
@@ -82,6 +85,8 @@ struct Ui {
     gifs: Gifs,
     /// Which thumbnails show their format in a corner (Preferences).
     labels: Cell<TypeLabels>,
+    /// Whether the preview has its details panel (the button below the X), kept on this device.
+    details_on: Cell<bool>,
     thumbs: Thumbs,
     grid: gtk::GridView,
     preview: Preview,
@@ -104,6 +109,13 @@ struct Preview {
     controls: gtk::MediaControls,
     /// Which frame of the GIF shows, of how many.
     frame: gtk::Label,
+    /// The details of the meme, at the right if the button below the X says so: how far it is
+    /// out, 0 to 1 (the meme and its bars make room for it), and the animation moving it.
+    details_button: gtk::ToggleButton,
+    panel: gtk::ScrolledWindow,
+    details: gtk::ListBox,
+    panel_t: Cell<f64>,
+    panel_animation: RefCell<Option<adw::TimedAnimation>>,
     tags: gtk::Box,
     tag_entry: gtk::Entry,
     /// `win.close-preview`, enabled while it is open: Esc goes elsewhere otherwise.
@@ -186,6 +198,7 @@ pub fn present(app: &adw::Application) {
         cells: RefCell::default(),
         gifs: Gifs::default(),
         labels: Cell::new(TypeLabels::get()),
+        details_on: Cell::new(settings::get("details_panel").is_some_and(|v| v == "true")),
         thumbs: Thumbs {
             made: RefCell::default(),
             wanted: Arc::default(),
@@ -202,6 +215,11 @@ pub fn present(app: &adw::Application) {
             bar: get(&b, "preview_bar"),
             controls: get(&b, "preview_controls"),
             frame: get(&b, "preview_frame"),
+            details_button: get(&b, "preview_details_button"),
+            panel: get(&b, "preview_panel"),
+            details: get(&b, "preview_details"),
+            panel_t: Cell::new(0.0),
+            panel_animation: RefCell::default(),
             tags: get(&b, "preview_tags"),
             tag_entry: get(&b, "preview_tag_entry"),
             close_action: gio::SimpleAction::new("close-preview", None),
@@ -1097,6 +1115,7 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
         }
     });
 
+    connect_details(ui, app);
     place_close(ui);
     if let Some(settings) = gtk::Settings::default() {
         let weak = Rc::downgrade(ui);
@@ -1106,6 +1125,157 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
             }
         });
     }
+}
+
+/// `win.toggle-details`, the button below the X: the preview's details panel on or off, kept
+/// on this device and in place for every meme until turned off.
+fn connect_details(ui: &Rc<Ui>, app: &adw::Application) {
+    let on = ui.details_on.get();
+    let action = gio::SimpleAction::new_stateful("toggle-details", None, &on.to_variant());
+    action.connect_activate(|action, _| {
+        let on = action
+            .state()
+            .and_then(|s| s.get::<bool>())
+            .unwrap_or(false);
+        action.change_state(&(!on).to_variant());
+    });
+    let weak = Rc::downgrade(ui);
+    action.connect_change_state(move |action, state| {
+        let (Some(ui), Some(on)) = (weak.upgrade(), state.and_then(|s| s.get::<bool>())) else {
+            return;
+        };
+        action.set_state(&on.to_variant());
+        ui.details_on.set(on);
+        settings::set("details_panel", &on.to_string());
+        ui.preview.details_button.set_tooltip_text(Some(&if on {
+            gettext("Hide Details")
+        } else {
+            gettext("Show Details")
+        }));
+        animate_panel(&ui, on);
+    });
+    ui.window.add_action(&action);
+    ui.preview.details_button.set_tooltip_text(Some(&if on {
+        gettext("Hide Details")
+    } else {
+        gettext("Show Details")
+    }));
+    app.set_accels_for_action("win.toggle-details", &["<Alt>Return"]);
+}
+
+/// Slide the details panel out or back while a meme is shown (the meme resizes with it); in
+/// place at once otherwise.
+fn animate_panel(ui: &Rc<Ui>, on: bool) {
+    let p = &ui.preview;
+    if let Some(running) = p.panel_animation.take() {
+        running.pause();
+    }
+    let to = if on { 1.0 } else { 0.0 };
+    if p.path.borrow().is_none() {
+        p.panel_t.set(to);
+        return;
+    }
+    let weak = Rc::downgrade(ui);
+    let target = adw::CallbackAnimationTarget::new(move |t| {
+        if let Some(ui) = weak.upgrade() {
+            ui.preview.panel_t.set(t);
+            set_progress(&ui, ui.preview.progress.get());
+        }
+    });
+    let animation = adw::TimedAnimation::new(&p.root, p.panel_t.get(), to, 250, target);
+    animation.set_easing(adw::Easing::EaseOutCubic);
+    *p.panel_animation.borrow_mut() = Some(animation.clone());
+    animation.play();
+}
+
+/// The details of the meme in the preview, as rows of the panel: what the file is, how big, when
+/// changed, and its tags. Videos and GIFs add what the player says as it knows.
+fn show_details(ui: &Rc<Ui>) {
+    let p = &ui.preview;
+    let Some(path) = p.path.borrow().clone() else {
+        return;
+    };
+    while let Some(row) = p.details.first_child() {
+        p.details.remove(&row);
+    }
+    let add = |title: String, value: String| {
+        let row = adw::ActionRow::builder()
+            .title(title)
+            .subtitle(value)
+            .subtitle_selectable(true)
+            .use_markup(false)
+            .css_classes(["property"])
+            .build();
+        p.details.append(&row);
+    };
+    add(gettext("Name"), name(&path).to_string());
+    let folder = Path::new(&path).parent().and_then(|f| f.to_str());
+    if let Some(folder) = folder {
+        let home = glib::home_dir();
+        let shown = Path::new(folder)
+            .strip_prefix(&home)
+            .map_or_else(|_| folder.to_string(), |rel| format!("~/{}", rel.display()));
+        add(gettext("Folder"), shown);
+    }
+    let (content, _) = gio::content_type_guess(Some(path.as_str()), None::<&[u8]>);
+    add(
+        gettext("Type"),
+        gio::content_type_get_description(&content).to_string(),
+    );
+    let meta = std::fs::metadata(&path).ok();
+    if let Some(meta) = &meta {
+        add(gettext("Size"), glib::format_size(meta.len()).to_string());
+    }
+    let mut size_known = false;
+    if library::kind(&path) != Some(Kind::Video)
+        && let Some((_, w, h)) = gdk_pixbuf::Pixbuf::file_info(&path)
+    {
+        add(gettext("Dimensions"), format!("{w} × {h}"));
+        size_known = true;
+    }
+    if let Some(delays) = memeplex_core::gif::frame_delays(&path) {
+        add(gettext("Frames"), delays.len().to_string());
+        let ms: u32 = delays.iter().sum();
+        add(
+            gettext("Duration"),
+            format!("{:.2} s", f64::from(ms) / 1000.0),
+        );
+    }
+    if let Some(stream) = p
+        .video
+        .media_stream()
+        .filter(|_| library::kind(&path) == Some(Kind::Video))
+        && stream.is_prepared()
+    {
+        let (w, h) = (stream.intrinsic_width(), stream.intrinsic_height());
+        if !size_known && w > 0 && h > 0 {
+            add(gettext("Dimensions"), format!("{w} × {h}"));
+        }
+        let secs = stream.duration() / 1_000_000;
+        if secs > 0 {
+            add(
+                gettext("Duration"),
+                format!("{}:{:02}", secs / 60, secs % 60),
+            );
+        }
+    }
+    if let Some(modified) = meta
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .and_then(|d| glib::DateTime::from_unix_local(d.as_secs() as i64).ok())
+        .and_then(|d| d.format("%x %X").ok())
+    {
+        add(gettext("Modified"), modified.to_string());
+    }
+    let tags = sorted(meme_tags(ui), |t| t);
+    add(
+        gettext("Tags"),
+        if tags.is_empty() {
+            gettext("None")
+        } else {
+            tags.join(", ")
+        },
+    );
 }
 
 /// The X button on the side of the window's own controls, as the decoration layout puts them
@@ -1123,6 +1293,12 @@ fn place_close(ui: &Ui) {
     } else {
         gtk::Align::End
     });
+    // The details button at the right: below the X, or in its place.
+    let button = &ui.preview.details_button;
+    button.set_margin_top(if left { 12 } else { 12 + 34 + 8 });
+    ui.preview
+        .panel
+        .set_margin_top(if left { 64 } else { 12 + 34 + 8 + 34 + 8 });
 }
 
 /// Show `path` over the grid, grown out of its thumbnail at `preview.position`: a picture, a
@@ -1135,6 +1311,15 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
     let video = library::kind(&path) == Some(Kind::Video);
     if video {
         p.video.set_filename(Some(&path));
+        // Its size and length are in the details once the player knows them.
+        if let Some(stream) = p.video.media_stream() {
+            let weak = Rc::downgrade(ui);
+            stream.connect_prepared_notify(move |_| {
+                if let Some(ui) = weak.upgrade() {
+                    show_details(&ui);
+                }
+            });
+        }
         p.stack.set_visible_child(&p.video);
     } else {
         p.stack.set_visible_child(&p.picture);
@@ -1153,6 +1338,9 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
     let controls = video || p.controls.get_visible();
     p.bar
         .set_margin_bottom(if controls { CONTROLS_HEIGHT } else { 12 });
+    // The details panel as it is set, from the start.
+    p.panel_animation.take().inspect(|a| a.pause());
+    p.panel_t.set(if ui.details_on.get() { 1.0 } else { 0.0 });
     p.tag_entry.set_text("");
     show_tags(ui);
     find_thumbnail(ui, true);
@@ -1243,7 +1431,16 @@ fn set_progress(ui: &Ui, v: f64) {
     p.bar.set_opacity(v);
     p.controls.set_opacity(v);
     p.frame.set_opacity(v);
-    let to = p.inset.get();
+    p.details_button.set_opacity(v);
+    // The details panel fades in with the preview and the meme and its bars make room for it.
+    let room = PANEL_ROOM * p.panel_t.get();
+    p.panel.set_visible(p.panel_t.get() > 0.0);
+    p.panel.set_opacity(v * p.panel_t.get());
+    p.bar.set_margin_end(room.round() as i32);
+    p.controls.set_margin_end(12 + room.round() as i32);
+    p.frame.set_margin_end(12 + room.round() as i32);
+    let mut to = p.inset.get();
+    to[2] += room;
     let (from, opacity) = match p.from.get() {
         Some(from) => (from, 1.0),
         None => (to.map(|t| t + 48.0), v),
@@ -1591,6 +1788,7 @@ fn show_tags(ui: &Rc<Ui>) {
         p.tags.append(&button);
     }
     p.tags.set_visible(p.tags.first_child().is_some());
+    show_details(ui);
 }
 
 /// Give the meme in the preview `tags`, saved to the tag file a few seconds later. Returns

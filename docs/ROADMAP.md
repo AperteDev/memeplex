@@ -51,7 +51,7 @@ the same models and code.
 - Tag files changed by another device read as they sync (a file monitor on `Memeplex/`), not
   only when the folder opens.
 - A filter by format (pictures, GIFs, videos) in View Options.
-- Search on top of the grid; the file's details, tags and text next to the preview.
+- Search on top of the grid; the file's OCR text in the preview's details panel.
 - More than one meme folder in the sidebar, kept by the core with the index.
 - GIFs and videos playing, muted, on hover only (View Options plays all those on screen); animated WebP playing in the preview
   (it shows its first frame).

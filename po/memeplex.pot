@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Memeplex\n"
 "Report-Msgid-Bugs-To: https://github.com/AperteDev/memeplex/issues\n"
-"POT-Creation-Date: 2026-11-04 13:18+0100\n"
+"POT-Creation-Date: 2026-11-04 13:49+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,55 +17,104 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: memeplex/linux/app/src/window.rs:317
+#: memeplex/linux/app/src/window.rs:335
 msgid "Open Meme Folder"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:414
+#: memeplex/linux/app/src/window.rs:432
 msgid "Every meme has a tag"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:416
+#: memeplex/linux/app/src/window.rs:434
 msgid "This folder has no pictures or videos"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:445 memeplex/linux/app/src/window.rs:519
+#: memeplex/linux/app/src/window.rs:463 memeplex/linux/app/src/window.rs:537
 msgid "All Memes"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:446 memeplex/linux/app/src/window.rs:520
+#: memeplex/linux/app/src/window.rs:464 memeplex/linux/app/src/window.rs:538
 msgid "Untagged"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1364
+#: memeplex/linux/app/src/window.rs:1151 memeplex/linux/app/src/window.rs:1159
+msgid "Hide Details"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1153 memeplex/linux/app/src/window.rs:1161
+#: memeplex/linux/app/ui/window.blp:290
+msgid "Show Details"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1211
+msgid "Name"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1218
+msgid "Folder"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1222
+msgid "Type"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1227
+msgid "Size"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1233 memeplex/linux/app/src/window.rs:1252
+msgid "Dimensions"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1237
+msgid "Frames"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1240 memeplex/linux/app/src/window.rs:1257
+msgid "Duration"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1268
+msgid "Modified"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1272 memeplex/linux/app/ui/window.blp:42
+msgid "Tags"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1274
+msgid "None"
+msgstr ""
+
+#: memeplex/linux/app/src/window.rs:1561
 #, rust-format
 msgid "Frame {current} / {total}"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1580
+#: memeplex/linux/app/src/window.rs:1777
 #, rust-format
 msgid "Remove “{tag}”"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1619
+#: memeplex/linux/app/src/window.rs:1817
 msgid "Still reading this meme, try again in a moment"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1669
+#: memeplex/linux/app/src/window.rs:1867
 msgid "Use Folder Names as Tags?"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1671
+#: memeplex/linux/app/src/window.rs:1869
 msgid ""
 "Each meme gets the names of the folders it is in as tags, besides those it "
 "has."
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1675
+#: memeplex/linux/app/src/window.rs:1873
 msgid "Cancel"
 msgstr ""
 
-#: memeplex/linux/app/src/window.rs:1676
+#: memeplex/linux/app/src/window.rs:1874
 msgid "Add Tags"
 msgstr ""
 
@@ -108,10 +157,6 @@ msgstr ""
 msgid "Main Menu"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:42
-msgid "Tags"
-msgstr ""
-
 #: memeplex/linux/app/ui/window.blp:58
 msgid "Folders"
 msgstr ""
@@ -152,27 +197,27 @@ msgstr ""
 msgid "Add Tag"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:257
+#: memeplex/linux/app/ui/window.blp:276
 msgid "Close Preview (Esc)"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:288
+#: memeplex/linux/app/ui/window.blp:322
 msgid "Animate Thumbnails"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:294
+#: memeplex/linux/app/ui/window.blp:328
 msgid "Use Folder Names as Tags…"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:298
+#: memeplex/linux/app/ui/window.blp:332
 msgid "Preferences"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:299
+#: memeplex/linux/app/ui/window.blp:333
 msgid "About Memeplex"
 msgstr ""
 
-#: memeplex/linux/app/ui/window.blp:300
+#: memeplex/linux/app/ui/window.blp:334
 msgid "Quit"
 msgstr ""
 
