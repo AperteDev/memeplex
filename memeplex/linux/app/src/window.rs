@@ -113,7 +113,8 @@ struct Preview {
     animation: RefCell<Option<adw::TimedAnimation>>,
 }
 
-/// GIFs playing in the grid, if View Options says so. GStreamer crashed (in its own thread) when
+/// GIFs and videos playing in the grid, the first if View Options says so, the second
+/// also for a moment to take a frame. GStreamer crashed (in its own thread) when
 /// many were made or torn down at once, so one is started or let go every tick of a timer (10 ms).
 #[derive(Default)]
 struct Gifs {
@@ -870,9 +871,19 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
     let size = ui.size.get();
     image.set_size_request(size, size);
     if library::kind(&path) == Some(Kind::Video) {
-        // ponytail: an icon until videos play (GStreamer), which gives their frames too.
-        image.set_pixel_size(size / 3);
-        image.set_icon_name(Some("video-x-generic-symbolic"));
+        // A frame once `start_media` has taken one, an icon until then.
+        let still = ui.thumbs.made.borrow().get(&path).map(|(_, t)| t.clone());
+        match still {
+            Some(texture) => {
+                image.set_pixel_size(size);
+                image.set_paintable(Some(&texture));
+            }
+            None => {
+                image.set_pixel_size(size / 3);
+                image.set_icon_name(Some("video-x-generic-symbolic"));
+            }
+        }
+        play_visible(ui, item);
         return;
     }
     image.set_pixel_size(size);
@@ -1207,36 +1218,56 @@ fn play_thumbnail(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
     tick(ui);
 }
 
-/// Play the GIF in the cell of `item`, if animation is on and the cell is on screen.
+/// Start what the cell of `item` needs if it is on screen: a GIF playing if animation is on; a
+/// video playing if it is, or else for a moment, for a frame as its still.
 fn play_visible(ui: &Rc<Ui>, item: &gtk::ListItem) {
-    if let (true, Some(path), Some(image)) = (
-        ui.gifs.on.get(),
-        path_of(item),
-        item.child().and_downcast::<gtk::Image>(),
-    ) && image.is_mapped()
-        && path.to_ascii_lowercase().ends_with(".gif")
-    {
+    let (Some(path), Some(image)) = (path_of(item), item.child().and_downcast::<gtk::Image>())
+    else {
+        return;
+    };
+    if !image.is_mapped() {
+        return;
+    }
+    let wanted = match library::kind(&path) {
+        Some(Kind::Video) => ui.gifs.on.get() || still_side(ui, &path).is_some(),
+        _ => ui.gifs.on.get() && path.to_ascii_lowercase().ends_with(".gif"),
+    };
+    if wanted {
         play_thumbnail(ui, &path, &image);
     }
 }
 
-/// Stop the GIF playing in the cell of `item`, if one does; its still shows again.
+/// The side in pixels a video's still is wanted at, `None` if one that large is made.
+fn still_side(ui: &Ui, path: &str) -> Option<i32> {
+    let side = ui.size.get() * ui.window.scale_factor();
+    let made = ui.thumbs.made.borrow().get(path).map(|(s, _)| *s);
+    made.is_none_or(|made| made < side).then_some(side)
+}
+
+/// Stop the media playing in the cell of `item`, if any does; its still shows again.
 fn stop_animation(ui: &Rc<Ui>, item: &gtk::ListItem) {
     let Some(path) = path_of(item) else {
         return;
     };
-    let g = &ui.gifs;
-    g.queue.borrow_mut().retain(|(p, _)| *p != path);
-    if let Some(media) = g.playing.borrow_mut().remove(&path) {
-        media.pause();
+    ui.gifs.queue.borrow_mut().retain(|(p, _)| *p != path);
+    if release(ui, &path) {
         // The cell lets go of it, so that it ends with the timer.
         if let Some(image) = item.child().and_downcast::<gtk::Image>() {
             let still = ui.thumbs.made.borrow().get(&path).map(|(_, t)| t.clone());
             image.set_paintable(still.as_ref());
         }
-        g.dead.borrow_mut().push(media);
-        tick(ui);
     }
+}
+
+/// Pause the media playing for `path`, to be let go by the timer.
+fn release(ui: &Rc<Ui>, path: &str) -> bool {
+    let Some(media) = ui.gifs.playing.borrow_mut().remove(path) else {
+        return false;
+    };
+    media.pause();
+    ui.gifs.dead.borrow_mut().push(media);
+    tick(ui);
+    true
 }
 
 /// The timer: let one stopped GIF go, or else start the next one waiting.
@@ -1260,20 +1291,67 @@ fn tick(ui: &Rc<Ui>) {
             return glib::ControlFlow::Break;
         };
         if let Some(image) = image.upgrade() {
-            start_gif(&ui, &path, &image);
+            start_media(&ui, &path, &image);
         }
         glib::ControlFlow::Continue
     });
 }
 
-fn start_gif(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
+/// A video's frame as a texture `side` pixels at most on a side, drawn by the window's renderer.
+fn frame_of(ui: &Ui, media: &gtk::MediaFile, side: i32) -> Option<gdk::Texture> {
+    let (iw, ih) = (
+        f64::from(media.intrinsic_width()),
+        f64::from(media.intrinsic_height()),
+    );
+    if iw <= 0.0 || ih <= 0.0 {
+        return None;
+    }
+    let scale = (f64::from(side) / iw).min(f64::from(side) / ih).min(1.0);
+    let (w, h) = ((iw * scale).max(1.0).round(), (ih * scale).max(1.0).round());
+    let snapshot = gtk::Snapshot::new();
+    media.snapshot(&snapshot, w, h);
+    let node = snapshot.to_node()?;
+    let viewport = gtk::graphene::Rect::new(0.0, 0.0, w as f32, h as f32);
+    Some(
+        ui.window
+            .native()?
+            .renderer()?
+            .render_texture(&node, Some(&viewport)),
+    )
+}
+
+/// Play a GIF or video in a cell, muted and looped, in place of its still. A video's first frame
+/// is kept as its still; if animation is off it stops there.
+fn start_media(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
     let media = gtk::MediaFile::for_filename(path);
-    let (weak, image, gif) = (Rc::downgrade(ui), image.downgrade(), path.to_string());
+    media.set_muted(true);
+    let video = library::kind(path) == Some(Kind::Video);
+    let (weak, image, file) = (Rc::downgrade(ui), image.downgrade(), path.to_string());
     media.connect_invalidate_contents(move |media| {
-        if let (Some(ui), Some(image)) = (weak.upgrade(), image.upgrade())
-            && ui.gifs.playing.borrow().get(&gif) == Some(media)
-            && image.paintable().as_ref() != Some(media.upcast_ref())
+        let (Some(ui), Some(image)) = (weak.upgrade(), image.upgrade()) else {
+            return;
+        };
+        if ui.gifs.playing.borrow().get(&file) != Some(media) {
+            return;
+        }
+        // The first frames come before the size is known: tried again until then.
+        if video
+            && let Some(side) = still_side(&ui, &file)
+            && let Some(texture) = frame_of(&ui, media, side)
         {
+            ui.thumbs
+                .made
+                .borrow_mut()
+                .insert(file.clone(), (side, texture.clone()));
+            image.set_pixel_size(ui.size.get());
+            image.set_paintable(Some(&texture));
+            if !ui.gifs.on.get() {
+                release(&ui, &file);
+                return;
+            }
+        }
+        if image.paintable().as_ref() != Some(media.upcast_ref()) {
+            image.set_pixel_size(ui.size.get());
             image.set_paintable(Some(media));
         }
     });

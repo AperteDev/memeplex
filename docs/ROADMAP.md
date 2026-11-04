@@ -52,9 +52,8 @@ the same models and code.
   only when the folder opens.
 - A filter by format (pictures, GIFs, videos) in View Options.
 - Search on top of the grid; the file's details, tags and text next to the preview.
-- Thumbnails of videos (a frame through GStreamer) in place of their icon.
 - More than one meme folder in the sidebar, kept by the core with the index.
-- GIFs and videos playing, muted, on hover in the grid; animated WebP playing in the preview
+- GIFs and videos playing, muted, on hover only (View Options plays all those on screen); animated WebP playing in the preview
   (it shows its first frame).
 - Copy to the clipboard (the image itself, not its path), open with, show in folder. Dragged out
   of the grid, a meme is its file: whether chat apps that want the image itself need it too.
