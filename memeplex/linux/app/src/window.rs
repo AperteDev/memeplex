@@ -35,9 +35,6 @@ const CONTROLS_HEIGHT: i32 = 64;
 /// Room the details panel takes at the right of the preview: its width, its margin and a gap.
 const PANEL_ROOM: f64 = 344.0;
 
-/// Room above the meme in the preview, for its tags and the X button.
-const PREVIEW_TOP: f64 = 54.0;
-
 /// What the grid shows, picked in the sidebar.
 #[derive(Clone, Debug, PartialEq)]
 enum Group {
@@ -1330,10 +1327,10 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
             load_picture(ui, &path);
         }
     }
-    // Room above for the tags; pictures keep a little around them too, videos fill the rest of
-    // the panel, controls at its foot.
+    // Pictures keep a little around them; videos fill the panel, controls at its foot. The
+    // buttons and tags float over the meme.
     let side = if video { 0.0 } else { 12.0 };
-    p.inset.set([side, PREVIEW_TOP, side, side]);
+    p.inset.set([side; 4]);
     // The tags above the controls of a GIF or a video, at the foot of the panel.
     let controls = video || p.controls.get_visible();
     p.bar
