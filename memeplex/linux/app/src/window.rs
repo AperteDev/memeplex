@@ -73,6 +73,9 @@ struct Ui {
     size: Cell<i32>,
     /// The grid's cells, to resize when the size changes.
     cells: RefCell<Vec<glib::WeakRef<gtk::ListItem>>>,
+    /// Whether GIFs play in the grid (View Options), and those playing, by path.
+    animate: Cell<bool>,
+    playing: RefCell<HashMap<String, gtk::MediaFile>>,
     thumbs: Thumbs,
     grid: gtk::GridView,
     preview: Preview,
@@ -156,6 +159,8 @@ pub fn present(app: &adw::Application) {
         shown: RefCell::new(Group::All),
         size: Cell::new(0),
         cells: RefCell::default(),
+        animate: Cell::new(false),
+        playing: RefCell::default(),
         thumbs: Thumbs {
             made: RefCell::default(),
             wanted: Arc::default(),
@@ -236,6 +241,9 @@ pub fn present(app: &adw::Application) {
     let size_box: gtk::Box = get(&b, "size_box");
     get::<gtk::PopoverMenu>(&b, "view_popover").add_child(&size_box, "size");
     connect_size(&ui, &get(&b, "size"));
+    let animate_box: gtk::Box = get(&b, "animate_box");
+    get::<gtk::PopoverMenu>(&b, "view_popover").add_child(&animate_box, "animate");
+    connect_animate(&ui, &get(&b, "animate"));
     ui.grid
         .set_model(Some(&gtk::NoSelection::new(Some(ui.memes.clone()))));
     ui.grid.set_factory(Some(&grid_factory(&ui)));
@@ -745,6 +753,32 @@ fn connect_size(ui: &Rc<Ui>, scale: &gtk::Scale) {
     });
 }
 
+/// The animation switch in View Options, as saved on this device (off by default): GIFs in
+/// the cells on screen play or stop as it turns.
+fn connect_animate(ui: &Rc<Ui>, switch: &gtk::Switch) {
+    switch.set_active(settings::get("animate_thumbnails").is_some_and(|v| v == "true"));
+    ui.animate.set(switch.is_active());
+    let weak = Rc::downgrade(ui);
+    switch.connect_active_notify(move |switch| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        ui.animate.set(switch.is_active());
+        settings::set("animate_thumbnails", &switch.is_active().to_string());
+        // Rebound: a GIF starts playing, or its still shows again.
+        let cells: Vec<_> = ui
+            .cells
+            .borrow()
+            .iter()
+            .filter_map(|c| c.upgrade())
+            .collect();
+        for item in &cells {
+            stop_animation(&ui, item);
+            bind_cell(&ui, item);
+        }
+    });
+}
+
 /// The grid's cells: a meme's thumbnail, or an icon for a video.
 fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
@@ -780,6 +814,7 @@ fn grid_factory(ui: &Rc<Ui>) -> gtk::SignalListItemFactory {
     factory.connect_unbind(move |_, item| {
         if let (Some(ui), Some(path)) = (weak.upgrade(), path_of(item.downcast_ref().unwrap())) {
             ui.thumbs.wanted.lock().unwrap().remove(&path);
+            stop_animation(&ui, item.downcast_ref().unwrap());
         }
     });
     factory
@@ -808,6 +843,9 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
         return;
     }
     image.set_pixel_size(size);
+    if ui.animate.get() && path.to_ascii_lowercase().ends_with(".gif") {
+        play_thumbnail(ui, &path, &image);
+    }
     let size = size * ui.window.scale_factor();
     match ui.thumbs.made.borrow().get(&path) {
         // Made at least this large; a smaller one shows until a sharper one is made.
@@ -846,6 +884,8 @@ fn bind_cell(ui: &Rc<Ui>, item: &gtk::ListItem) {
         if let Some(item) = item.upgrade()
             && path_of(&item) == Some(path)
             && let Some(image) = item.child().and_downcast::<gtk::Image>()
+            // Unless the GIF has taken its place.
+            && !image.paintable().is_some_and(|p| p.is::<gtk::MediaFile>())
         {
             image.set_paintable(Some(&texture));
         }
@@ -1099,13 +1139,7 @@ fn play_gif(ui: &Rc<Ui>, path: &str) {
             ui.preview.picture.set_paintable(Some(media));
         }
     });
-    // Looped by hand: with `loop` set, GTK (4.24) stops a GIF on its last frame at the end.
-    media.connect_ended_notify(|media| {
-        if media.is_ended() {
-            media.seek(0);
-            media.play();
-        }
-    });
+    loop_media(&media);
     let (weak, gif) = (Rc::downgrade(ui), path.to_string());
     media.connect_error_notify(move |media| {
         if let Some(ui) = weak.upgrade()
@@ -1117,6 +1151,43 @@ fn play_gif(ui: &Rc<Ui>, path: &str) {
     });
     media.play();
     *ui.preview.gif.borrow_mut() = Some(media);
+}
+
+/// Looped by hand: with `loop` set, GTK (4.24) stops a GIF on its last frame at the end.
+fn loop_media(media: &gtk::MediaFile) {
+    media.connect_ended_notify(|media| {
+        if media.is_ended() {
+            media.seek(0);
+            media.play();
+        }
+    });
+}
+
+/// A GIF playing in its cell, in place of its still, which shows until the first frame is
+/// decoded.
+fn play_thumbnail(ui: &Rc<Ui>, path: &str, image: &gtk::Image) {
+    let media = gtk::MediaFile::for_filename(path);
+    let (weak, image, gif) = (Rc::downgrade(ui), image.downgrade(), path.to_string());
+    media.connect_invalidate_contents(move |media| {
+        if let (Some(ui), Some(image)) = (weak.upgrade(), image.upgrade())
+            && ui.playing.borrow().get(&gif) == Some(media)
+            && image.paintable().as_ref() != Some(media.upcast_ref())
+        {
+            image.set_paintable(Some(media));
+        }
+    });
+    loop_media(&media);
+    media.play();
+    if let Some(old) = ui.playing.borrow_mut().insert(path.to_string(), media) {
+        old.pause();
+    }
+}
+
+/// Stop the GIF playing in the cell of `item`, if one does.
+fn stop_animation(ui: &Ui, item: &gtk::ListItem) {
+    if let Some(media) = path_of(item).and_then(|p| ui.playing.borrow_mut().remove(&p)) {
+        media.pause();
+    }
 }
 
 /// A picture at full size: its thumbnail at once, the full one once loaded.
