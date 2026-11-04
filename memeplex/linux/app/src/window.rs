@@ -119,6 +119,9 @@ struct Preview {
     panel_animation: RefCell<Option<adw::TimedAnimation>>,
     tags: gtk::Box,
     tag_entry: gtk::Entry,
+    /// The same in the details panel, which takes the bar's place while it is out.
+    panel_tags: adw::WrapBox,
+    panel_tag_entry: gtk::Entry,
     /// `win.close-preview`, enabled while it is open: Esc goes elsewhere otherwise.
     close_action: gio::SimpleAction,
     /// The meme shown, `None` while closed (or closing), and its place in the grid.
@@ -235,6 +238,8 @@ pub fn present(app: &adw::Application) {
             panel_animation: RefCell::default(),
             tags: get(&b, "preview_tags"),
             tag_entry: get(&b, "preview_tag_entry"),
+            panel_tags: get(&b, "preview_panel_tags"),
+            panel_tag_entry: get(&b, "preview_panel_tag_entry"),
             close_action: gio::SimpleAction::new("close-preview", None),
             path: RefCell::default(),
             position: Cell::new(0),
@@ -1241,7 +1246,7 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
     app.set_accels_for_action("win.close-preview", &["Escape"]);
     // Enter adds the tag typed (or several, between commas).
     let weak = Rc::downgrade(ui);
-    ui.preview.tag_entry.connect_activate(move |entry| {
+    let add_typed = move |entry: &gtk::Entry| {
         let Some(ui) = weak.upgrade() else {
             return;
         };
@@ -1252,7 +1257,9 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
         if change_tags(&ui, tags) {
             entry.set_text("");
         }
-    });
+    };
+    ui.preview.tag_entry.connect_activate(add_typed.clone());
+    ui.preview.panel_tag_entry.connect_activate(add_typed);
 
     connect_details(ui, app);
     place_close(ui);
@@ -1406,15 +1413,6 @@ fn show_details(ui: &Rc<Ui>) {
     {
         add(gettext("Modified"), modified.to_string());
     }
-    let tags = sorted(meme_tags(ui), |t| t);
-    add(
-        gettext("Tags"),
-        if tags.is_empty() {
-            gettext("None")
-        } else {
-            tags.join(", ")
-        },
-    );
 }
 
 /// The X button on the side of the window's own controls, as the decoration layout puts them
@@ -1481,7 +1479,9 @@ fn open_preview(ui: &Rc<Ui>, path: String) {
     p.panel_animation.take().inspect(|a| a.pause());
     p.panel_t.set(if ui.details_on.get() { 1.0 } else { 0.0 });
     p.tag_entry.set_text("");
+    p.panel_tag_entry.set_text("");
     show_tags(ui);
+    show_details(ui);
     find_thumbnail(ui, true);
     p.close_action.set_enabled(true);
     if !p.root.is_visible() {
@@ -1567,7 +1567,9 @@ fn set_progress(ui: &Ui, v: f64) {
     p.progress.set(v);
     p.backdrop.set_opacity(v);
     p.close.set_opacity(v);
-    p.bar.set_opacity(v);
+    // The bar of tags over the meme gives way to the panel's chips as it comes out.
+    p.bar.set_opacity(v * (1.0 - p.panel_t.get()));
+    p.bar.set_visible(p.panel_t.get() < 1.0);
     p.controls.set_opacity(v);
     p.frame.set_opacity(v);
     p.details_button.set_opacity(v);
@@ -1906,33 +1908,49 @@ fn meme_tags(ui: &Ui) -> Vec<String> {
     indexed(ui, |i| i.tags(path))
 }
 
-/// Show the tags of the meme in the preview above it, each a button that removes it.
+/// Show the tags of the meme in the preview, in the bar over it and as chips in the details
+/// panel, each a button that removes it.
 /// ponytail: no suggestions while typing; a popover of the tags that match when typos pile up.
 fn show_tags(ui: &Rc<Ui>) {
     let p = &ui.preview;
     while let Some(child) = p.tags.first_child() {
         p.tags.remove(&child);
     }
+    while let Some(child) = p.panel_tags.first_child() {
+        p.panel_tags.remove(&child);
+    }
     for tag in sorted(meme_tags(ui), |t| t) {
-        let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        line.append(&gtk::Label::new(Some(&tag)));
-        line.append(&gtk::Image::from_icon_name("window-close-symbolic"));
-        let button = gtk::Button::builder().child(&line).build();
-        let remove = gettext("Remove “{tag}”").replace("{tag}", &tag);
-        button.set_tooltip_text(Some(&remove));
-        button.update_property(&[gtk::accessible::Property::Label(&remove)]);
-        let weak = Rc::downgrade(ui);
-        button.connect_clicked(move |_| {
-            if let Some(ui) = weak.upgrade() {
-                let tags = meme_tags(&ui).into_iter().filter(|t| *t != tag).collect();
-                change_tags(&ui, tags);
-                ui.preview.tag_entry.grab_focus();
-            }
-        });
-        p.tags.append(&button);
+        p.tags.append(&tag_chip(ui, &tag));
+        p.panel_tags.append(&tag_chip(ui, &tag));
     }
     p.tags.set_visible(p.tags.first_child().is_some());
-    show_details(ui);
+    p.panel_tags
+        .set_visible(p.panel_tags.first_child().is_some());
+}
+
+/// A button with `tag` that removes it from the meme in the preview.
+fn tag_chip(ui: &Rc<Ui>, tag: &str) -> gtk::Button {
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    line.append(&gtk::Label::new(Some(tag)));
+    line.append(&gtk::Image::from_icon_name("window-close-symbolic"));
+    let button = gtk::Button::builder().child(&line).build();
+    let remove = gettext("Remove “{tag}”").replace("{tag}", tag);
+    button.set_tooltip_text(Some(&remove));
+    button.update_property(&[gtk::accessible::Property::Label(&remove)]);
+    let (weak, tag) = (Rc::downgrade(ui), tag.to_string());
+    button.connect_clicked(move |_| {
+        if let Some(ui) = weak.upgrade() {
+            let tags = meme_tags(&ui).into_iter().filter(|t| *t != tag).collect();
+            change_tags(&ui, tags);
+            // Back to the entry that is shown.
+            if ui.preview.panel_t.get() > 0.0 {
+                ui.preview.panel_tag_entry.grab_focus();
+            } else {
+                ui.preview.tag_entry.grab_focus();
+            }
+        }
+    });
+    button
 }
 
 /// Give the meme in the preview `tags`, saved to the tag file a few seconds later. Returns
@@ -1945,21 +1963,25 @@ fn change_tags(ui: &Rc<Ui>, tags: Vec<String>) -> bool {
     ) else {
         return false;
     };
-    let entry = &ui.preview.tag_entry;
+    let entries = [&ui.preview.tag_entry, &ui.preview.panel_tag_entry];
     match index.set_tags(root, path, tags) {
         Ok(true) => {
-            entry.remove_css_class("error");
-            entry.set_tooltip_text(None);
+            for entry in entries {
+                entry.remove_css_class("error");
+                entry.set_tooltip_text(None);
+            }
             show_tags(ui);
             refresh_tags(ui);
             save_later(ui);
             true
         }
         Ok(false) => {
-            entry.add_css_class("error");
-            entry.set_tooltip_text(Some(&gettext(
-                "Still reading this meme, try again in a moment",
-            )));
+            for entry in entries {
+                entry.add_css_class("error");
+                entry.set_tooltip_text(Some(&gettext(
+                    "Still reading this meme, try again in a moment",
+                )));
+            }
             false
         }
         Err(e) => {

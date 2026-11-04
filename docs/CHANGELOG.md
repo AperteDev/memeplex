@@ -27,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and videos, both with controls (play, pause, progress), and the frame a GIF is at. The X
   button (on the side of the window's own close button) or Esc shrinks it back into its thumbnail.
 - Linux: a details panel at the right of the preview, with the file's name, folder, type, size,
-  dimensions, length or frames, date and tags. The info button next to the X (Alt+Enter) shows
+  dimensions, length or frames and date, and its tags as chips to remove or add to (the bar of
+  tags over the meme gives way to them). The info button next to the X (Alt+Enter) shows
   it for every meme until it is hidden again; the meme and its bars make room for it, also as
   it grows out of its thumbnail.
 - Tags: the main way to group memes, any number per meme, kept with the meme's content so they

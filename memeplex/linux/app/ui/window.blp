@@ -262,10 +262,55 @@ Adw.ApplicationWindow window {
             margin-bottom: 12;
             hscrollbar-policy: never;
 
-            Gtk.ListBox preview_details {
-              selection-mode: none;
+            Gtk.Box {
+              orientation: vertical;
+              spacing: 12;
               valign: start;
-              styles ["boxed-list"]
+
+              Gtk.ListBox preview_details {
+                selection-mode: none;
+                styles ["boxed-list"]
+              }
+
+              // The meme's tags as chips, each removed by a click, and one more typed in
+              // (src/window.rs `show_tags`), in place of the bar over the meme while the panel
+              // is out.
+              Gtk.ListBox {
+                selection-mode: none;
+                styles ["boxed-list"]
+
+                Gtk.ListBoxRow {
+                  activatable: false;
+
+                  Gtk.Box {
+                    orientation: vertical;
+                    spacing: 6;
+                    margin-top: 12;
+                    margin-bottom: 12;
+                    margin-start: 12;
+                    margin-end: 12;
+
+                    Gtk.Label {
+                      label: _("Tags");
+                      xalign: 0;
+                      styles ["caption", "dim-label"]
+                    }
+
+                    Adw.WrapBox preview_panel_tags {
+                      child-spacing: 6;
+                      line-spacing: 6;
+                    }
+
+                    Gtk.Entry preview_panel_tag_entry {
+                      placeholder-text: _("Add Tag…");
+
+                      accessibility {
+                        label: _("Add Tag");
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
 
