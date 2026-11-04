@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tags: the main way to group memes, any number per meme, kept with the meme's content so they
   stay through renames and moves. The sidebar shows All Memes, Untagged (the memes still to
   sort) and the tags, each with its count; the folder tree moved to its second view, Folders.
-  The preview shows the meme's tags above it: Enter adds the ones typed in (several between
+  The preview shows the meme's tags at its bottom: Enter adds the ones typed in (several between
   commas), a click on one removes it. "Use Folder Names as Tags…" in the main menu tags every
   meme with the folders it is in. A thumbnail dragged onto a tag in the sidebar gets that tag
   (and leaves Untagged, if that is shown); dragged elsewhere, it is the meme's file, for other

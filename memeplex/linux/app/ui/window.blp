@@ -203,12 +203,12 @@ Adw.ApplicationWindow window {
           }
 
           // The meme's tags, each removed by a click, and one more typed in (src/window.rs
-          // `show_tags`), above the meme.
+          // `show_tags`), at the bottom of the meme.
           [overlay]
           Gtk.Box preview_bar {
             halign: center;
-            valign: start;
-            margin-top: 12;
+            valign: end;
+            margin-bottom: 12;
             spacing: 6;
             styles ["toolbar", "osd", "tag-bar"]
 
