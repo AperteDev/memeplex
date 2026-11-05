@@ -25,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux: a click on a thumbnail (or Enter) opens the meme over the whole panel, growing out of
   the thumbnail as the grid fades behind it: pictures at full size, GIFs playing in a loop
   and videos, both with controls (play, pause, progress), and the frame a GIF is at. The X
-  button (on the side of the window's own close button) or Esc shrinks it back into its thumbnail.
+  button (on the side of the window's own close button), Esc or a click on a picture or
+  beside it shrinks it back into its thumbnail.
 - Linux: a details panel at the right of the preview, with the file's name, folder, type, size,
   dimensions, length or frames and date, and its tags as chips to remove or add to (the bar of
   tags over the meme gives way to them); typing one suggests the tags that exist (Up and Down

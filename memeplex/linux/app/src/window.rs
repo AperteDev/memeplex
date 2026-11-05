@@ -1244,6 +1244,16 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
     });
     ui.window.add_action(close);
     app.set_accels_for_action("win.close-preview", &["Escape"]);
+    // A click on the picture or on what is behind it closes it too; a video keeps its own.
+    for widget in [
+        ui.preview.picture.upcast_ref::<gtk::Widget>(),
+        ui.preview.backdrop.upcast_ref(),
+    ] {
+        let click = gtk::GestureClick::new();
+        let close = ui.preview.close_action.clone();
+        click.connect_released(move |_, _, _, _| close.activate(None));
+        widget.add_controller(click);
+    }
     // Enter adds the tag typed (or several, between commas).
     let weak = Rc::downgrade(ui);
     let add_typed = move |entry: &gtk::Entry| {
