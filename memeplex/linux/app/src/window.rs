@@ -1260,6 +1260,8 @@ fn connect_preview(ui: &Rc<Ui>, app: &adw::Application) {
     };
     ui.preview.tag_entry.connect_activate(add_typed.clone());
     ui.preview.panel_tag_entry.connect_activate(add_typed);
+    connect_completion(ui, &ui.preview.tag_entry, true);
+    connect_completion(ui, &ui.preview.panel_tag_entry, false);
 
     connect_details(ui, app);
     place_close(ui);
@@ -1906,6 +1908,126 @@ fn meme_tags(ui: &Ui) -> Vec<String> {
         return Vec::new();
     };
     indexed(ui, |i| i.tags(path))
+}
+
+/// Suggest the tags that exist while one is typed into `entry` (the last of those between
+/// commas), in a list above it or below: Down and Up pick, Tab or a click completes, Enter still
+/// adds what is typed.
+fn connect_completion(ui: &Rc<Ui>, entry: &gtk::Entry, above: bool) {
+    let list = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::Browse)
+        .can_focus(false)
+        .build();
+    let popover = gtk::Popover::builder()
+        .autohide(false)
+        .has_arrow(false)
+        .can_focus(false)
+        .position(if above {
+            gtk::PositionType::Top
+        } else {
+            gtk::PositionType::Bottom
+        })
+        .child(&list)
+        .build();
+    popover.set_parent(entry);
+    // The typed tag, the one being typed replaced by `tag`.
+    let complete = {
+        let (entry, popover) = (entry.clone(), popover.clone());
+        move |tag: &str| {
+            let text = entry.text();
+            let head = text.rfind(',').map_or("", |i| &text[..=i]);
+            let sep = if head.is_empty() { "" } else { " " };
+            entry.set_text(&format!("{head}{sep}{tag}"));
+            entry.set_position(-1);
+            popover.popdown();
+        }
+    };
+    let complete = Rc::new(complete);
+    let c = complete.clone();
+    list.connect_row_activated(move |_, row| {
+        if let Some(label) = row.child().and_downcast::<gtk::Label>() {
+            c(&label.label());
+        }
+    });
+    let (weak, list_w, popover_w) = (Rc::downgrade(ui), list.clone(), popover.clone());
+    entry.connect_changed(move |entry| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        let text = entry.text();
+        let typed = text.rsplit(',').next().unwrap_or("").trim().to_lowercase();
+        let mut found: Vec<String> = Vec::new();
+        if !typed.is_empty() {
+            let mine = meme_tags(&ui);
+            let rows = ui.tag_rows.borrow();
+            let all = rows.iter().filter_map(|g| match g {
+                Group::Tag(t) => Some(t.clone()),
+                _ => None,
+            });
+            found = all
+                .filter(|t| {
+                    let low = t.to_lowercase();
+                    low != typed && low.contains(&typed) && !mine.contains(t)
+                })
+                .collect();
+            // Those that start with it first.
+            found.sort_by_key(|t| !t.to_lowercase().starts_with(&typed));
+            found.truncate(6);
+        }
+        list_w.remove_all();
+        for tag in &found {
+            let label = gtk::Label::builder().label(tag).xalign(0.0).build();
+            let row = gtk::ListBoxRow::builder()
+                .child(&label)
+                .focusable(false)
+                .build();
+            list_w.append(&row);
+        }
+        if found.is_empty() {
+            popover_w.popdown();
+        } else {
+            list_w.select_row(list_w.row_at_index(0).as_ref());
+            list_w.set_width_request(entry.width());
+            popover_w.popup();
+        }
+    });
+    let keys = gtk::EventControllerKey::new();
+    let (list_k, popover_k) = (list.clone(), popover.clone());
+    keys.connect_key_pressed(move |_, key, _, _| {
+        if !popover_k.is_visible() {
+            return glib::Propagation::Proceed;
+        }
+        let at = list_k.selected_row().map_or(-1, |r| r.index());
+        match key {
+            gdk::Key::Down | gdk::Key::Up => {
+                let next = if key == gdk::Key::Down {
+                    at + 1
+                } else {
+                    at - 1
+                };
+                if let Some(row) = list_k.row_at_index(next) {
+                    list_k.select_row(Some(&row));
+                }
+            }
+            gdk::Key::Tab => {
+                if let Some(label) = list_k
+                    .selected_row()
+                    .and_then(|r| r.child())
+                    .and_downcast::<gtk::Label>()
+                {
+                    complete(&label.label());
+                }
+            }
+            gdk::Key::Escape => popover_k.popdown(),
+            _ => return glib::Propagation::Proceed,
+        }
+        glib::Propagation::Stop
+    });
+    entry.add_controller(keys);
+    let popover_f = popover.clone();
+    let focus = gtk::EventControllerFocus::new();
+    focus.connect_leave(move |_| popover_f.popdown());
+    entry.add_controller(focus);
 }
 
 /// Show the tags of the meme in the preview, in the bar over it and as chips in the details

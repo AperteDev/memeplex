@@ -47,7 +47,7 @@ the same models and code.
 
 - GTK4 and libadwaita, Blueprint UI files, as in Todav and Notav.
 - Favorites and Recent in the Tags view, after All; combined tags through search.
-- Tagging several thumbnails selected at once; the tags that match suggested while typing one.
+- Tagging several thumbnails selected at once.
 - Tag files changed by another device read as they sync (a file monitor on `Memeplex/`), not
   only when the folder opens.
 - A filter by format (pictures, GIFs, videos) in View Options.
